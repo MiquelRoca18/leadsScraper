@@ -1,0 +1,72 @@
+@extends('layouts.app')
+
+@section('title', 'Bases de datos — Scraper Lead')
+
+@section('content')
+
+  <div class="mb-8">
+    <h1 class="text-2xl font-bold text-slate-800 mb-1">Tus bases de datos</h1>
+    <p class="text-slate-500 text-sm">Gestiona los contactos y leads extraídos por plataforma.</p>
+  </div>
+
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+    {{-- Google Maps --}}
+    <a href="/leads" class="group bg-white rounded-2xl border border-slate-200 p-6 flex flex-col gap-4 hover:border-blue-400 hover:shadow-md transition-all no-underline">
+      <div class="flex items-center gap-3">
+        <div class="w-11 h-11 rounded-xl bg-[#e8f0fe] flex items-center justify-center flex-shrink-0">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+            <defs>
+              <linearGradient id="gm_db" x1="12" y1="2" x2="12" y2="22" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stop-color="#EA4335"/>
+                <stop offset="100%" stop-color="#B31412"/>
+              </linearGradient>
+            </defs>
+            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="url(#gm_db)"/>
+            <circle cx="12" cy="9" r="3" fill="white"/>
+            <circle cx="12" cy="9" r="1.3" fill="#EA4335"/>
+          </svg>
+        </div>
+        <div class="font-semibold text-slate-800">Google Maps</div>
+      </div>
+      <div>
+        <div class="text-3xl font-bold text-slate-900">{{ number_format($stats['google_maps'] ?? 0) }}</div>
+        <div class="text-sm text-slate-400 mt-0.5">Emails encontrados</div>
+      </div>
+      <div class="flex items-center gap-1 text-blue-600 text-sm font-medium group-hover:gap-2 transition-all">
+        Ver base de datos
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+        </svg>
+      </div>
+    </a>
+
+    {{-- Instagram coming soon --}}
+    <div class="bg-white rounded-2xl border border-slate-200 p-6 flex flex-col gap-4 opacity-60 cursor-not-allowed">
+      <div class="flex items-center gap-3">
+        <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-orange-100 to-purple-100 flex items-center justify-center flex-shrink-0">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <rect x="2" y="2" width="20" height="20" rx="5" ry="5" stroke="url(#ig3)" stroke-width="2"/>
+            <circle cx="12" cy="12" r="4" stroke="url(#ig3)" stroke-width="2"/>
+            <circle cx="17.5" cy="6.5" r="1" fill="#C13584"/>
+            <defs>
+              <linearGradient id="ig3" x1="2" y1="22" x2="22" y2="2" gradientUnits="userSpaceOnUse">
+                <stop stop-color="#F58529"/><stop offset="0.5" stop-color="#C13584"/><stop offset="1" stop-color="#833AB4"/>
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
+        <div class="font-semibold text-slate-800">Instagram</div>
+      </div>
+      <div>
+        <div class="text-3xl font-bold text-slate-400">0</div>
+        <div class="text-sm text-slate-400 mt-0.5">Emails encontrados</div>
+      </div>
+      <div>
+        <span class="bg-slate-100 text-slate-500 text-xs font-medium px-2.5 py-1 rounded-full">Próximamente</span>
+      </div>
+    </div>
+
+  </div>
+
+@endsection
