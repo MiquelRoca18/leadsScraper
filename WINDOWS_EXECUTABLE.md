@@ -20,11 +20,12 @@
 
 ## Paso 2: Ejecutar la aplicación
 
-Simplemente **haz doble clic en `run_mapleads.bat`** (en la raíz del proyecto)
+Simplemente **haz doble clic en `start_mapleads.bat`** (en la raíz del proyecto)
 
+- Inicia el backend (scraper) y el frontend juntos
 - Se abrirá automáticamente el navegador en `http://localhost:8081`
-- La consola mostrará los logs del servidor
-- Presiona CTRL+C para detener
+- Se abrirá una ventana con el backend (no la cierres mientras uses la app)
+- Para cerrar: cierra ambas ventanas
 
 ---
 
