@@ -1,4 +1,4 @@
-import { emailStatusClass, safeText, toSafeHttpUrl } from '../lib/dom-utils';
+import { emailStatusClass, safeText, toSafeHttpUrl } from '../lib/dom-utils.js';
 
 let _scrapingInProgress = false;
 

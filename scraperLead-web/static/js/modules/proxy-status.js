@@ -1,7 +1,7 @@
 import {
   startProxyStatusPolling,
   subscribeProxyStatus,
-} from '../lib/proxy-state';
+} from '../lib/proxy-state.js';
 
 function getStatusColorClass(availableNow, dailyPct) {
   if (availableNow <= 2 || dailyPct >= 80) return 'bg-red-500';

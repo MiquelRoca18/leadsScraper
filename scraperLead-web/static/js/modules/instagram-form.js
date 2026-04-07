@@ -1,4 +1,4 @@
-import { emailStatusClass, safeText, toSafeHttpUrl } from '../lib/dom-utils';
+import { emailStatusClass, safeText, toSafeHttpUrl } from '../lib/dom-utils.js';
 
 export function initInstagramForm() {
   const page = document.getElementById('instagram-form-page');
