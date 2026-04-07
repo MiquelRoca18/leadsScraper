@@ -14,13 +14,13 @@
    build_exe.bat
    ```
 3. **Espera 2-5 minutos** (verás mensajes de compilación)
-4. Cuando termine, verás: `dist/MapLeads-Frontend/MapLeads-Frontend.exe`
+4. Cuando termine, verás: `scraperLead-web/dist/MapLeads-Frontend/MapLeads-Frontend.exe`
 
 ---
 
 ## Paso 2: Ejecutar la aplicación
 
-Simplemente **haz doble clic en `run_mapleads.bat`**
+Simplemente **haz doble clic en `run_mapleads.bat`** (en la raíz del proyecto)
 
 - Se abrirá automáticamente el navegador en `http://localhost:8081`
 - La consola mostrará los logs del servidor
