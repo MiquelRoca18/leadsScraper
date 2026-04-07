@@ -8,6 +8,14 @@ echo    Compilando MapLeads Executable
 echo ============================================
 echo.
 
+REM Copiar .env.example a .env si no existe
+if not exist ".env" (
+    echo Creando .env desde .env.example...
+    copy .env.example .env
+    echo ✓ .env creado
+    echo.
+)
+
 REM Verificar que Python está instalado
 python --version >nul 2>&1
 if errorlevel 1 (
