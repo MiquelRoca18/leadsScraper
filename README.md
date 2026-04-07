@@ -14,11 +14,21 @@ Herramienta para extraer emails de negocios locales desde Google Maps.
 
 ### 1. Backend (Google Maps scraper)
 
+**Mac/Linux:**
 ```bash
 cd mapleads
 python3 -m venv venv
 source venv/bin/activate
 cp .env.example .env
+pip install -r requirements.txt
+```
+
+**Windows:**
+```cmd
+cd mapleads
+python -m venv venv
+venv\Scripts\activate
+copy .env.example .env
 pip install -r requirements.txt
 ```
 
@@ -46,9 +56,18 @@ PORT=8081
 Abre **2 terminales**:
 
 **Terminal 1 — Backend:**
+
+Mac/Linux:
 ```bash
 cd mapleads
 source venv/bin/activate
+uvicorn backend.main:app --reload --port 8001
+```
+
+Windows:
+```cmd
+cd mapleads
+venv\Scripts\activate
 uvicorn backend.main:app --reload --port 8001
 ```
 
