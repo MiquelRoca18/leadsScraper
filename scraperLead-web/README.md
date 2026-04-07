@@ -2,129 +2,36 @@
 
 Frontend de Scraper Lead — construido con **FastAPI + Jinja2**.
 
-## Requisitos
+## Instalación
 
-- Python 3.11+ (debe estar instalado en tu sistema)
-
-## Instalación Rápida (Usuarios No-Técnicos)
-
-### Opción 1: Usando el Ejecutable (.exe) — Recomendado
-
-**Paso 1: Generar el ejecutable**
-1. Abre `PowerShell` o `CMD` en este directorio
-2. Ejecuta:
-   ```bash
-   python -m pip install -r requirements.txt
-   pyinstaller build_mapleads.spec
-   ```
-3. Espera a que termine (puede tardar 2-5 minutos)
-4. Se creará una carpeta `dist/MapLeads-Frontend/` con el ejecutable
-
-**Paso 2: Ejecutar la aplicación**
-- **Opción A (Fácil):** Haz doble clic en `run_mapleads.bat`
-- **Opción B (Manual):** Ve a `dist/MapLeads-Frontend/` y haz doble clic en `MapLeads-Frontend.exe`
-- La aplicación se abrirá automáticamente en tu navegador en `http://localhost:8081`
-
-**Paso 3: Detener la aplicación**
-- Presiona `CTRL+C` en la ventana de consola o ciérrala
-
-> **Nota:** El ejecutable se genera una única vez. Después de eso, solo necesitas hacer doble clic en `run_mapleads.bat` para ejecutar. Puedes compartir toda la carpeta `dist/MapLeads-Frontend/` a otros usuarios sin necesidad de compilar de nuevo.
-
-### Opción 2: Ejecutar en Desarrollo
-
-**Instalación:**
 ```bash
 pip install -r requirements.txt
+cp .env.example .env    # Mac/Linux
+copy .env.example .env  # Windows
 ```
 
-**Configuración:**
-Edita el archivo `.env` con las URLs de los backends:
+## Ejecutar
 
-```env
-MAPLEADS_API_URL=http://localhost:8001
-INSTALEADS_API_URL=http://localhost:8002
-PORT=8081
-```
-
-**Arranque:**
-
-Con recarga automática en desarrollo:
-```bash
-uvicorn main:app --reload --port 8081
-```
-
-O usando el launcher (abre el navegador automáticamente):
 ```bash
 python launcher.py
 ```
 
-Abre `http://localhost:8081` en tu navegador.
+El navegador se abrirá automáticamente en `http://localhost:8081`
+
+---
+
+## Para crear un .exe en Windows
+
+Ver [WINDOWS_EXECUTABLE.md](../WINDOWS_EXECUTABLE.md) en la raíz del proyecto.
 
 ## Estructura
 
 ```
-scraperLead-web/
-├── launcher.py              # Script para iniciar la app (abre navegador)
-├── main.py                  # App FastAPI: rutas, handlers y proxy
-├── build_mapleads.spec      # Configuración de PyInstaller
-├── build_exe.bat            # Script batch para compilar .exe
-├── run_mapleads.bat         # Script batch para ejecutar .exe
-├── requirements.txt         # Dependencias Python
-├── .env                     # Variables de entorno
-├── templates/               # HTML con Jinja2
-│   ├── base.html           # Layout base (sidebar + nav)
-│   ├── home.html           # Dashboard
-│   ├── search.html         # Búsqueda en Google Maps
-│   ├── leads.html          # Base de datos de leads
-│   ├── history.html        # Historial de búsquedas
-│   ├── databases.html      # Resumen de bases de datos
-│   └── instagram.html      # Extracción de Instagram
-└── static/
-    └── js/                  # Módulos JavaScript
-        ├── app.js          # Entry point
-        ├── bootstrap.js
-        ├── lib/
-        │   ├── dom-utils.js
-        │   └── proxy-state.js
-        └── modules/
-            ├── search-form.js
-            ├── instagram-form.js
-            └── proxy-status.js
+├── main.py              # App FastAPI
+├── launcher.py          # Script para iniciar (abre navegador automáticamente)
+├── requirements.txt
+├── .env                 # Variables de entorno
+├── templates/           # HTML con Jinja2
+├── static/js/           # Módulos JavaScript
+└── .env.example         # Plantilla de configuración
 ```
-
-## Solución de Problemas
-
-### El .exe no se abre / dice que falta un módulo
-- Asegúrate de que ejecutaste `pyinstaller build_mapleads.spec` completamente
-- Si ves errores, ejecuta nuevamente el script batch
-
-### La aplicación se abre pero no carga el contenido
-- Verifica que los backends están corriendo:
-  - MapLeads API: `http://localhost:8001`
-  - InstaLeads API: `http://localhost:8002`
-- Edita `.env` con las URLs correctas si es necesario
-
-### El navegador no se abre automáticamente
-- Abre manualmente `http://localhost:8081` en tu navegador
-- El servidor estará disponible en ese puerto
-
-## Para Desarrolladores
-
-**Desarrollo con recarga automática:**
-```bash
-uvicorn main:app --reload --port 8081
-```
-
-**Formateo de código:**
-```bash
-pip install black
-black main.py launcher.py
-```
-
-**Compilar .exe:**
-```bash
-pip install pyinstaller
-pyinstaller build_mapleads.spec
-```
-
-El ejecutable se genera en `dist/MapLeads-Frontend/MapLeads-Frontend.exe`
