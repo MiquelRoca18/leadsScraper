@@ -36,12 +36,21 @@ pip install -r requirements.txt
 
 ### 2. Frontend (FastAPI)
 
+**Mac/Linux:**
 ```bash
 cd scraperLead-web
+cp .env.example .env
 pip install -r requirements.txt
 ```
 
-Edita el `.env` con las URLs de los backends:
+**Windows:**
+```cmd
+cd scraperLead-web
+copy .env.example .env
+pip install -r requirements.txt
+```
+
+El `.env` ya viene configurado con los valores por defecto. Edítalo si tus backends están en puertos diferentes:
 
 ```env
 MAPLEADS_API_URL=http://localhost:8001
