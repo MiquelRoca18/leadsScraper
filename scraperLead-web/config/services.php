@@ -39,4 +39,8 @@ return [
         'api_url' => env('MAPLEADS_API_URL'),
     ],
 
+    'instaleads' => [
+        'api_url' => env('INSTALEADS_API_URL'),
+    ],
+
 ];

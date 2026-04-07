@@ -1,0 +1,396 @@
+@extends('layouts.app')
+
+@section('title', 'Instagram — Scraper Lead')
+
+@section('content')
+  <div
+    id="instagram-form-page"
+    data-health='@json($health ?? ["status" => "unknown"])'
+    data-recent-jobs='@json($recentJobs ?? [])'
+  >
+    @if(($state ?? null) === 'timeout' || ($state ?? null) === 'upstream_error')
+      <div class="bg-amber-50 border border-amber-200 text-amber-800 rounded-xl px-4 py-3 mb-4 text-sm" role="status" aria-live="polite">
+        <p class="font-medium">{{ $message ?? 'No se pudo consultar InstaLeads en este momento.' }}</p>
+        <p class="mt-1 text-amber-700">Puedes seguir navegando, pero la extracción puede fallar temporalmente.</p>
+      </div>
+    @endif
+
+    {{-- Header --}}
+    <div class="flex items-center gap-3 mb-5">
+      <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-orange-100 to-purple-100 flex items-center justify-center shrink-0">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <rect x="2" y="2" width="20" height="20" rx="5" ry="5" stroke="url(#ig-grad-header)" stroke-width="2"/>
+          <circle cx="12" cy="12" r="4" stroke="url(#ig-grad-header)" stroke-width="2"/>
+          <circle cx="17.5" cy="6.5" r="1" fill="#C13584"/>
+          <defs>
+            <linearGradient id="ig-grad-header" x1="2" y1="22" x2="22" y2="2" gradientUnits="userSpaceOnUse">
+              <stop stop-color="#F58529"/>
+              <stop offset="0.5" stop-color="#C13584"/>
+              <stop offset="1" stop-color="#833AB4"/>
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>
+      <div>
+        <h1 class="text-xl font-bold text-slate-800">Instagram Extraction</h1>
+        <p class="text-slate-500 text-sm">Modo A: Google Dorking (sin login) · Modo B: Seguidores (sesión autenticada)</p>
+      </div>
+    </div>
+
+    {{-- Global alert --}}
+    <div id="ig-alert" class="hidden mb-4"></div>
+
+    {{-- Status row: health + session + daily usage --}}
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+      {{-- Health --}}
+      <div class="bg-white border border-slate-200 rounded-xl px-4 py-3">
+        <p class="text-xs font-semibold tracking-widest text-slate-400 uppercase mb-1.5">Estado del scraper</p>
+        <div class="flex items-center gap-2">
+          <span id="ig-health-dot" class="w-2.5 h-2.5 rounded-full bg-slate-300 shrink-0"></span>
+          <p id="ig-health-text" class="text-sm font-medium text-slate-700">Comprobando...</p>
+        </div>
+        <p id="ig-health-details" class="text-xs text-slate-500 mt-1">—</p>
+      </div>
+
+      {{-- Session --}}
+      <div class="bg-white border border-slate-200 rounded-xl px-4 py-3">
+        <p class="text-xs font-semibold tracking-widest text-slate-400 uppercase mb-1.5">Sesión (Modo B)</p>
+        <div class="flex items-center gap-2">
+          <span id="ig-session-dot" class="w-2.5 h-2.5 rounded-full bg-slate-300 shrink-0"></span>
+          <p id="ig-session-text" class="text-sm font-medium text-slate-700">Sin sesión</p>
+        </div>
+        <p id="ig-session-details" class="text-xs text-slate-500 mt-1">Necesaria para Modo B</p>
+      </div>
+
+      {{-- Daily usage --}}
+      <div class="bg-white border border-slate-200 rounded-xl px-4 py-3">
+        <p class="text-xs font-semibold tracking-widest text-slate-400 uppercase mb-1.5">Uso hoy</p>
+        <div class="flex items-center gap-3 text-sm">
+          <div>
+            <span id="ig-usage-unauth" class="font-semibold text-slate-800">—</span>
+            <span class="text-slate-400 text-xs"> sin login</span>
+          </div>
+          <div class="w-px h-4 bg-slate-200"></div>
+          <div>
+            <span id="ig-usage-auth" class="font-semibold text-slate-800">—</span>
+            <span class="text-slate-400 text-xs"> con login</span>
+          </div>
+        </div>
+        <p id="ig-usage-hourly" class="text-xs text-slate-500 mt-1">—</p>
+      </div>
+    </div>
+
+    {{-- Mode tabs --}}
+    <div class="flex gap-1 bg-slate-100 rounded-xl p-1 mb-4 w-fit">
+      <button id="ig-tab-dorking" type="button"
+        class="px-4 py-2 rounded-lg text-sm font-medium transition bg-white text-slate-800 shadow-sm">
+        Modo A — Dorking
+      </button>
+      <button id="ig-tab-followers" type="button"
+        class="px-4 py-2 rounded-lg text-sm font-medium transition text-slate-500 hover:text-slate-700">
+        Modo B — Seguidores
+      </button>
+    </div>
+
+    {{-- MODE A: Google Dorking --}}
+    <div id="ig-panel-dorking" class="bg-white border border-slate-200 rounded-2xl p-6 mb-4">
+      <div class="flex items-center gap-2 mb-1">
+        <span class="text-xs font-bold tracking-widest text-orange-500 uppercase">Modo A</span>
+        <span class="text-xs text-slate-400">Google Dorking · sin login · hasta 150 perfiles/día</span>
+      </div>
+      <p class="text-xs text-slate-500 mb-4">Busca perfiles de Instagram por nicho y ubicación usando Google. No requiere cuenta de Instagram.</p>
+
+      <div class="grid grid-cols-1 md:grid-cols-[1fr_1fr_140px_140px] gap-3 mb-4">
+        <div>
+          <label for="ig-niche" class="block text-xs font-semibold tracking-widest text-slate-400 uppercase mb-2">Nicho</label>
+          <input
+            id="ig-niche"
+            type="text"
+            placeholder="fotógrafo, nutricionista..."
+            class="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-400 transition"
+          />
+        </div>
+        <div>
+          <label for="ig-location" class="block text-xs font-semibold tracking-widest text-slate-400 uppercase mb-2">Ubicación</label>
+          <input
+            id="ig-location"
+            type="text"
+            placeholder="Valencia, Madrid..."
+            class="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-400 transition"
+          />
+        </div>
+        <div>
+          <label for="ig-dorking-max" class="block text-xs font-semibold tracking-widest text-slate-400 uppercase mb-2">Máx. perfiles</label>
+          <input
+            id="ig-dorking-max"
+            type="number" min="1" max="150" value="50"
+            title="Máximo seguro: 150/día para evitar bloqueos"
+            class="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-400 transition"
+          />
+        </div>
+        <div>
+          <label for="ig-dorking-email-goal" class="block text-xs font-semibold tracking-widest text-slate-400 uppercase mb-2">Emails objetivo</label>
+          <input
+            id="ig-dorking-email-goal"
+            type="number" min="1" max="500" value="20"
+            class="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-400 transition"
+          />
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button
+          id="ig-dorking-start-btn"
+          type="button"
+          class="px-5 py-2.5 bg-orange-500 text-white text-sm font-semibold rounded-xl hover:bg-orange-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          Buscar con Dorking
+        </button>
+        <button
+          id="ig-dorking-export-btn"
+          type="button"
+          class="px-4 py-2.5 border border-slate-200 text-slate-600 text-sm rounded-xl hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
+          disabled
+        >
+          Exportar CSV
+        </button>
+      </div>
+
+      <div id="ig-dorking-progress" class="hidden mt-4">
+        <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+          <div id="ig-dorking-bar" class="h-2 bg-orange-500 transition-all duration-300" style="width: 0%"></div>
+        </div>
+        <div class="mt-2 flex items-center justify-between gap-3">
+          <span id="ig-dorking-progress-text" class="text-xs text-slate-600">Progreso: 0/?</span>
+          <span id="ig-dorking-emails-text" class="text-xs text-slate-500">0 emails encontrados</span>
+        </div>
+      </div>
+    </div>
+
+    {{-- MODE B: Followers --}}
+    <div id="ig-panel-followers" class="hidden mb-4">
+
+      {{-- Login form (shown when no session) --}}
+      <div id="ig-login-panel" class="bg-amber-50 border border-amber-200 rounded-2xl p-6 mb-4">
+        <div class="flex items-start gap-3 mb-4">
+          <svg class="w-5 h-5 text-amber-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/>
+          </svg>
+          <div>
+            <p class="text-sm font-semibold text-amber-800">Sesión requerida para Modo B</p>
+            <p class="text-xs text-amber-700 mt-1">Usa una <strong>cuenta secundaria</strong>, nunca tu cuenta principal. La contraseña <strong>nunca se guarda</strong> — solo el token de sesión cifrado.</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+          <div>
+            <label for="ig-login-user" class="block text-xs font-semibold tracking-widest text-amber-700 uppercase mb-2">Usuario de Instagram</label>
+            <input
+              id="ig-login-user"
+              type="text"
+              placeholder="mi_cuenta_secundaria"
+              autocomplete="username"
+              class="w-full px-3 py-2.5 border border-amber-300 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white transition"
+            />
+          </div>
+          <div>
+            <label for="ig-login-pass" class="block text-xs font-semibold tracking-widest text-amber-700 uppercase mb-2">Contraseña</label>
+            <input
+              id="ig-login-pass"
+              type="password"
+              placeholder="••••••••"
+              autocomplete="current-password"
+              class="w-full px-3 py-2.5 border border-amber-300 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white transition"
+            />
+          </div>
+        </div>
+
+        <div id="ig-login-alert" class="hidden mb-3 text-xs px-3 py-2 rounded-lg border"></div>
+
+        <button
+          id="ig-login-btn"
+          type="button"
+          class="px-5 py-2.5 bg-amber-600 text-white text-sm font-semibold rounded-xl hover:bg-amber-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          Iniciar sesión
+        </button>
+      </div>
+
+      {{-- Followers form (shown when session active) --}}
+      <div id="ig-followers-panel" class="bg-white border border-slate-200 rounded-2xl p-6">
+        <div class="flex items-center justify-between mb-1">
+          <div>
+            <span class="text-xs font-bold tracking-widest text-purple-600 uppercase">Modo B</span>
+            <span class="text-xs text-slate-400 ml-2">Seguidores · sesión autenticada · hasta 80 perfiles/día</span>
+          </div>
+          <button
+            id="ig-logout-btn"
+            type="button"
+            class="text-xs text-slate-400 hover:text-red-500 transition px-2 py-1 rounded-lg hover:bg-red-50"
+          >
+            Cerrar sesión
+          </button>
+        </div>
+        <p class="text-xs text-slate-500 mb-4">Extrae emails de los seguidores de un perfil objetivo. Requiere sesión activa.</p>
+
+        {{-- Profile preview --}}
+        <div id="ig-profile-preview" class="hidden bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 mb-4">
+          <div class="flex items-center gap-3">
+            <img
+              id="ig-profile-avatar"
+              src="" alt="Perfil"
+              class="w-11 h-11 rounded-full object-cover border border-slate-200 bg-slate-100"
+              loading="lazy"
+            />
+            <div class="min-w-0">
+              <p id="ig-profile-username" class="text-sm font-semibold text-slate-800 truncate"></p>
+              <p id="ig-profile-meta" class="text-xs text-slate-500 truncate"></p>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-[1fr_160px_160px_160px] gap-3 mb-4">
+          <div>
+            <label for="ig-target" class="block text-xs font-semibold tracking-widest text-slate-400 uppercase mb-2">Cuenta objetivo</label>
+            <input
+              id="ig-target"
+              type="text"
+              placeholder="@nikerunning"
+              class="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500 transition"
+            />
+            <p class="mt-1 text-xs text-slate-400">Username del perfil cuyos seguidores quieres extraer.</p>
+          </div>
+          <div>
+            <label for="ig-followers-max" class="block text-xs font-semibold tracking-widest text-slate-400 uppercase mb-2">Máx. seguidores</label>
+            <input
+              id="ig-followers-max"
+              type="number" min="1" max="80" value="50"
+              title="Máximo seguro: 80/día para evitar bloqueos"
+              class="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500 transition"
+            />
+          </div>
+          <div>
+            <label for="ig-followers-email-goal" class="block text-xs font-semibold tracking-widest text-slate-400 uppercase mb-2">Emails objetivo</label>
+            <input
+              id="ig-followers-email-goal"
+              type="number" min="1" max="500" value="20"
+              class="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500 transition"
+            />
+          </div>
+          <div class="flex flex-col justify-end">
+            <button
+              id="ig-check-profile-btn"
+              type="button"
+              class="w-full px-3 py-2.5 border border-purple-200 text-purple-700 text-sm rounded-xl hover:bg-purple-50 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Comprobar perfil
+            </button>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <button
+            id="ig-followers-start-btn"
+            type="button"
+            class="px-5 py-2.5 bg-purple-600 text-white text-sm font-semibold rounded-xl hover:bg-purple-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled
+          >
+            Extraer seguidores
+          </button>
+          <button
+            id="ig-followers-export-btn"
+            type="button"
+            class="px-4 py-2.5 border border-slate-200 text-slate-600 text-sm rounded-xl hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
+            disabled
+          >
+            Exportar CSV
+          </button>
+        </div>
+
+        <div id="ig-followers-progress" class="hidden mt-4">
+          <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+            <div id="ig-followers-bar" class="h-2 bg-purple-500 transition-all duration-300" style="width: 0%"></div>
+          </div>
+          <div class="mt-2 flex items-center justify-between gap-3">
+            <span id="ig-followers-progress-text" class="text-xs text-slate-600">Progreso: 0/?</span>
+            <span id="ig-followers-emails-text" class="text-xs text-slate-500">0 emails encontrados</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {{-- Results section --}}
+    <div class="flex items-start justify-between gap-4 mb-4 flex-wrap">
+      <div>
+        <h2 class="text-lg font-bold text-slate-800">Instagram Leads</h2>
+        <p class="text-slate-500 text-sm">Visualiza leads agregados o por scrapeo.</p>
+      </div>
+      <div class="flex bg-slate-100 rounded-lg p-1 gap-1" id="ig-view-toggle">
+        <button id="ig-btn-todos" type="button"
+          class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition bg-white text-slate-700 shadow-sm">
+          Todos
+        </button>
+        <button id="ig-btn-scrapeos" type="button"
+          class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition text-slate-500 hover:text-slate-700">
+          Scrapeos
+        </button>
+      </div>
+    </div>
+
+    <div id="ig-scrapeos-placeholder" class="hidden bg-amber-50 border border-amber-200 text-amber-800 rounded-2xl px-5 py-4 mb-4 text-sm">
+      <p class="font-medium">Selecciona un scrapeo</p>
+      <p class="mt-1 text-amber-700">Elige un scrapeo para filtrar los leads de esa búsqueda concreta.</p>
+    </div>
+
+    <div id="ig-jobs-view" class="hidden mb-4">
+      <div class="bg-white border border-slate-200 rounded-2xl p-4">
+        <div class="flex items-center justify-between gap-3 mb-3">
+          <p class="text-sm font-semibold text-slate-800">Scrapeos guardados</p>
+          <p id="ig-jobs-count" class="text-xs text-slate-500"></p>
+        </div>
+        <div id="ig-jobs-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+        <div id="ig-jobs-empty" class="hidden mt-3 text-center text-slate-400 text-sm">Aún no hay scrapeos guardados.</div>
+        <div id="ig-jobs-error" class="hidden mt-3 text-center text-amber-700 text-sm bg-amber-50 border border-amber-200 rounded-xl p-3">No se pudo cargar la lista de scrapeos.</div>
+      </div>
+    </div>
+
+    {{-- Results table --}}
+    <div id="ig-results-wrapper" class="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+      <div class="px-5 py-4 border-b border-slate-100 flex flex-wrap items-center gap-3">
+        <span id="ig-results-count" class="text-sm font-medium text-slate-600"></span>
+        <label class="inline-flex items-center gap-2 text-xs text-slate-600">
+          <input id="ig-filter-has-email" type="checkbox" class="rounded border-slate-300 text-purple-600 focus:ring-purple-500">
+          Solo con email
+        </label>
+        <label class="inline-flex items-center gap-2 text-xs text-slate-600">
+          <input id="ig-filter-business" type="checkbox" class="rounded border-slate-300 text-purple-600 focus:ring-purple-500">
+          Solo business
+        </label>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-slate-50 border-b border-slate-100">
+            <tr>
+              <th class="text-left text-xs font-semibold text-slate-500 uppercase tracking-wide px-4 py-3">Username</th>
+              <th class="text-left text-xs font-semibold text-slate-500 uppercase tracking-wide px-4 py-3">Nombre</th>
+              <th class="text-left text-xs font-semibold text-slate-500 uppercase tracking-wide px-4 py-3">Email</th>
+              <th class="text-left text-xs font-semibold text-slate-500 uppercase tracking-wide px-4 py-3">Fuente email</th>
+              <th class="text-left text-xs font-semibold text-slate-500 uppercase tracking-wide px-4 py-3">Followers</th>
+              <th class="text-left text-xs font-semibold text-slate-500 uppercase tracking-wide px-4 py-3">Tipo cuenta</th>
+              <th class="text-left text-xs font-semibold text-slate-500 uppercase tracking-wide px-4 py-3">Origen</th>
+              <th class="text-left text-xs font-semibold text-slate-500 uppercase tracking-wide px-4 py-3">Web</th>
+            </tr>
+          </thead>
+          <tbody id="ig-results-tbody"></tbody>
+        </table>
+      </div>
+
+      <div id="ig-empty-state" class="py-14 text-center text-slate-400">
+        <svg class="mx-auto mb-3 opacity-30" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1"/>
+        </svg>
+        <p class="text-sm">Lanza una extracción para ver leads de Instagram aquí.</p>
+      </div>
+    </div>
+  </div>
+@endsection

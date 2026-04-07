@@ -5,41 +5,46 @@ namespace App\Services;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 
-class MapLeadsApiService
+class InstaLeadsApiService
 {
     private string $baseUrl;
 
     public function __construct()
     {
-        $this->baseUrl = rtrim((string) config('services.mapleads.api_url'), '/');
-        throw_if(blank($this->baseUrl), new RuntimeException('MAPLEADS_API_URL is not configured.'));
+        $this->baseUrl = rtrim((string) config('services.instaleads.api_url'), '/');
+        throw_if(blank($this->baseUrl), new RuntimeException('INSTALEADS_API_URL is not configured.'));
     }
 
-    public function getJobs(int $limit = 100): array
+    public function getHealth(): array
     {
-        return $this->getJson('/api/jobs', ['limit' => $limit], 10);
+        return $this->getJson('/api/instagram/health', [], 5);
+    }
+
+    public function getProfile(string $username): array
+    {
+        return $this->getJson("/api/instagram/profile/{$username}", [], 10);
     }
 
     public function getJob(string $jobId): array
     {
-        return $this->getJson("/api/jobs/{$jobId}", [], 10);
+        return $this->getJson("/api/instagram/jobs/{$jobId}", [], 10);
     }
 
-    public function getLeads(?string $jobId = null, int $limit = 500): array
+    public function getJobs(int $limit = 100): array
+    {
+        return $this->getJson('/api/instagram/jobs', ['limit' => $limit], 10);
+    }
+
+    public function getLeads(?string $jobId = null): array
     {
         $params = $jobId ? ['job_id' => $jobId] : [];
-        // El upstream suele limitar por defecto; pasamos un `limit` alto para que el
-        // frontend pueda paginar correctamente.
-        if ($limit > 0) {
-            $params['limit'] = $limit;
-        }
 
-        return $this->getJson('/api/leads', $params, 15);
+        return $this->getJson('/api/instagram/leads', $params, 15);
     }
 
     public function getStats(): array
     {
-        return $this->getJson('/api/stats', [], 10);
+        return $this->getJson('/api/instagram/stats', [], 5);
     }
 
     public function getProxyStatus(): array

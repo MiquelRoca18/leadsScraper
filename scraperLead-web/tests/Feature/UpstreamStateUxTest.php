@@ -64,7 +64,7 @@ class UpstreamStateUxTest extends TestCase
     {
         $mock = Mockery::mock(MapLeadsApiService::class);
         $mock->shouldReceive('getJob')->once()->with('job-1')->andThrow(new RuntimeException('backend down'));
-        $mock->shouldReceive('getLeads')->once()->with('job-1')->andThrow(new RuntimeException('backend down'));
+        $mock->shouldReceive('getLeads')->once()->with('job-1', 500)->andThrow(new RuntimeException('backend down'));
         $mock->shouldReceive('getProxyStatus')->once()->andReturn([]);
         $this->app->instance(MapLeadsApiService::class, $mock);
 

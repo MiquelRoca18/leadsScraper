@@ -35,16 +35,16 @@
       </div>
     </a>
 
-    {{-- Instagram coming soon --}}
-    <div class="bg-white rounded-2xl border border-slate-200 p-5 flex flex-col gap-4 opacity-60 cursor-not-allowed">
+    {{-- Instagram --}}
+    <a href="{{ route('instagram') }}" class="group bg-white rounded-2xl border border-slate-200 p-5 flex flex-col gap-4 hover:border-purple-400 hover:shadow-md transition-all no-underline">
       <div class="flex items-start gap-4">
         <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-100 to-purple-100 flex items-center justify-center flex-shrink-0">
           <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
-            <rect x="2" y="2" width="20" height="20" rx="5" ry="5" stroke="url(#ig-grad)" stroke-width="2"/>
-            <circle cx="12" cy="12" r="4" stroke="url(#ig-grad)" stroke-width="2"/>
+            <rect x="2" y="2" width="20" height="20" rx="5" ry="5" stroke="url(#ig-grad-home)" stroke-width="2"/>
+            <circle cx="12" cy="12" r="4" stroke="url(#ig-grad-home)" stroke-width="2"/>
             <circle cx="17.5" cy="6.5" r="1" fill="#C13584"/>
             <defs>
-              <linearGradient id="ig-grad" x1="2" y1="22" x2="22" y2="2" gradientUnits="userSpaceOnUse">
+              <linearGradient id="ig-grad-home" x1="2" y1="22" x2="22" y2="2" gradientUnits="userSpaceOnUse">
                 <stop stop-color="#F58529"/>
                 <stop offset="0.5" stop-color="#C13584"/>
                 <stop offset="1" stop-color="#833AB4"/>
@@ -54,13 +54,16 @@
         </div>
         <div>
           <div class="font-semibold text-slate-800 text-[15px]">Instagram</div>
-          <div class="text-slate-500 text-sm mt-0.5">Extrae leads desde perfiles, seguidores, hashtags y ubicaciones.</div>
+          <div class="text-slate-500 text-sm mt-0.5">Extrae emails de seguidores de una cuenta o de perfiles que usan un hashtag.</div>
         </div>
       </div>
-      <div class="flex items-center justify-end">
-        <span class="bg-slate-100 text-slate-500 text-xs font-medium px-2.5 py-1 rounded-full">Próximamente</span>
+      <div class="flex items-center justify-end text-purple-600 text-sm font-medium group-hover:gap-2 transition-all gap-1">
+        Empezar
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+        </svg>
       </div>
-    </div>
+    </a>
 
   </div>
 

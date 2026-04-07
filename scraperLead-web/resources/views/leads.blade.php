@@ -39,49 +39,153 @@
     </div>
   @endif
 
-  @if($jobId && !empty($job))
-  {{-- Job detail header --}}
   @php
-    $stClasses = ['done' => 'bg-green-100 text-green-700', 'failed' => 'bg-red-100 text-red-700', 'running' => 'bg-blue-100 text-blue-700'];
-    $stLabels  = ['done' => 'Completado', 'failed' => 'Error', 'running' => 'En curso'];
-    $st = $job['status'] ?? 'done';
-    $jobDate = !empty($job['started_at']) ? \Carbon\Carbon::parse($job['started_at'])->locale('es')->isoFormat('D MMM YYYY') : '—';
+    $dbViewStatusClasses = ['done' => 'bg-green-100 text-green-700', 'failed' => 'bg-red-100 text-red-700', 'running' => 'bg-blue-100 text-blue-700'];
+    $dbViewStatusLabels  = ['done' => 'Completado', 'failed' => 'Error', 'running' => 'En curso'];
+    $initialView = $jobId ? 'scrapeos' : 'todos';
   @endphp
-  <div class="flex items-start gap-4 mb-6 flex-wrap">
-    <a href="{{ route('history') }}" class="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800 transition mt-1 no-underline flex-shrink-0">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
-      </svg>
-      Historial
-    </a>
-    <div class="flex-1 min-w-0">
-      <h1 class="text-xl font-bold text-slate-800 truncate">{{ $job['query'] ?? "Job #{$jobId}" }}</h1>
-      <p class="text-sm text-slate-400 mt-0.5">{{ $job['location'] ?? 'Sin ubicación' }} · {{ $jobDate }} · <span class="text-xs px-1.5 py-0.5 rounded-full font-medium inline-block {{ $stClasses[$st] ?? 'bg-slate-100 text-slate-600' }}">{{ $stLabels[$st] ?? $st }}</span></p>
+
+  <div class="flex items-start justify-between gap-4 mb-5 flex-wrap">
+    <div>
+      <h1 class="text-2xl font-bold text-slate-800 mb-1">Leads</h1>
+      <p class="text-slate-500 text-sm">Visualiza leads agregados o por scrapeo.</p>
     </div>
-    <div class="flex items-center gap-6 flex-shrink-0">
-      <div class="text-center">
-        <div class="text-lg font-bold text-slate-800">{{ $job['total'] ?? 0 }}</div>
-        <div class="text-[10px] text-slate-400">Negocios</div>
-      </div>
-      <div class="text-center">
-        <div class="text-lg font-bold text-blue-600">{{ $job['emails_found'] ?? 0 }}</div>
-        <div class="text-[10px] text-slate-400">Emails</div>
-      </div>
-      <button type="button" data-action="open-export"
-              class="px-4 py-2 border border-slate-200 text-slate-600 text-sm rounded-lg hover:bg-slate-50 transition">
-        Exportar CSV
+    <div class="flex bg-slate-100 rounded-lg p-1 gap-1" id="db-view-toggle">
+      <button id="btn-db-todos" type="button"
+              class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition {{ $initialView === 'todos' ? 'bg-white text-slate-700 shadow-sm' : 'text-slate-500 hover:text-slate-700' }}">
+        Todos
+      </button>
+      <button id="btn-db-scrapeos" type="button"
+              class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition {{ $initialView === 'scrapeos' ? 'bg-white text-slate-700 shadow-sm' : 'text-slate-500 hover:text-slate-700' }}">
+        Scrapeos
       </button>
     </div>
   </div>
-  @else
-  <div class="mb-5">
-    <h1 class="text-2xl font-bold text-slate-800 mb-1">Todos los leads</h1>
-    <p class="text-slate-500 text-sm">Historial completo de leads extraídos.</p>
-  </div>
-  @endif
 
-  {{-- Filters --}}
-  <div class="bg-white border border-slate-200 rounded-xl px-4 py-3 mb-4 space-y-3">
+  <div id="db-header">
+    <div id="db-header-todos" class="{{ $initialView === 'todos' ? '' : 'hidden' }}">
+      <div class="mb-5">
+        <h1 class="text-2xl font-bold text-slate-800 mb-1">Todos los leads</h1>
+        <p class="text-slate-500 text-sm">Historial completo de leads extraídos.</p>
+      </div>
+    </div>
+
+    <div id="db-header-scrape" class="{{ $initialView === 'scrapeos' && $jobId && !empty($job) ? '' : 'hidden' }}">
+      {{-- Job detail header --}}
+      @php
+        $st = $job['status'] ?? 'done';
+        $jobDate = !empty($job['started_at']) ? \Carbon\Carbon::parse($job['started_at'])->locale('es')->isoFormat('D MMM YYYY') : '—';
+      @endphp
+      <div class="flex items-start gap-4 mb-6 flex-wrap">
+        <button id="db-back-to-cards-btn" type="button"
+                class="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800 transition mt-1 no-underline flex-shrink-0">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
+          </svg>
+          Volver a scrapeos
+        </button>
+        <div class="flex-1 min-w-0">
+          <h1 id="db-job-title" class="text-xl font-bold text-slate-800 truncate">{{ $job['query'] ?? "Job #{$jobId}" }}</h1>
+          <p class="text-sm text-slate-400 mt-0.5">
+            <span id="db-job-location">{{ $job['location'] ?? 'Sin ubicación' }}</span>
+            · <span id="db-job-date">{{ $jobDate }}</span>
+            · <span id="db-job-status-badge" class="text-xs px-1.5 py-0.5 rounded-full font-medium inline-block {{ $dbViewStatusClasses[$st] ?? 'bg-slate-100 text-slate-600' }}">{{ $dbViewStatusLabels[$st] ?? $st }}</span>
+          </p>
+        </div>
+        <div class="flex items-center gap-6 flex-shrink-0">
+          <div class="text-center">
+            <div id="db-job-total" class="text-lg font-bold text-slate-800">{{ $job['total'] ?? 0 }}</div>
+            <div class="text-[10px] text-slate-400">Negocios</div>
+          </div>
+          <div class="text-center">
+            <div id="db-job-emails" class="text-lg font-bold text-blue-600">{{ $job['emails_found'] ?? 0 }}</div>
+            <div class="text-[10px] text-slate-400">Emails</div>
+          </div>
+          <button type="button" data-action="open-export"
+                  class="px-4 py-2 border border-slate-200 text-slate-600 text-sm rounded-lg hover:bg-slate-50 transition">
+            Exportar CSV
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="db-scrapeos-placeholder" class="hidden bg-amber-50 border border-amber-200 text-amber-800 rounded-2xl px-5 py-4 mb-4 text-sm">
+    <p class="font-medium">Selecciona un scrapeo</p>
+    <p class="mt-1 text-amber-700">Cuando eliges un scrapeo aquí, se filtran los leads para esa búsqueda concreta.</p>
+  </div>
+
+  <div id="db-scrapeos-jobs" class="hidden mb-4">
+    @if(($jobsState ?? null) === 'upstream_error' || ($jobsState ?? null) === 'timeout')
+      <div class="bg-amber-50 border border-amber-200 rounded-2xl p-6 text-sm text-amber-800">
+        <p class="font-medium">{{ $jobsMessage ?? 'No se pudo cargar la lista de scrapeos.' }}</p>
+        <div class="mt-3 flex items-center gap-4">
+          <a href="{{ route('leads', $jobId ? ['job_id' => $jobId] : []) }}" class="underline font-medium text-amber-900">Reintentar</a>
+          <a href="{{ route('history') }}" class="underline font-medium text-blue-700">Ver historial</a>
+        </div>
+      </div>
+    @elseif(empty($jobs))
+      <div class="bg-white rounded-2xl border border-slate-200 p-6 text-center text-slate-400 text-sm">
+        Aún no hay scrapeos guardados.
+      </div>
+    @else
+      <div class="flex items-center justify-between gap-3 mb-3">
+        <p class="text-sm font-semibold text-slate-800">Scrapeos guardados</p>
+        <p class="text-xs text-slate-500">{{ count($jobs) }} disponibles</p>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        @foreach($jobs as $j)
+          @php
+            $st = $j['status'] ?? 'done';
+            $badgeClass = $dbViewStatusClasses[$st] ?? 'bg-slate-100 text-slate-600';
+            $badgeLabel = $dbViewStatusLabels[$st] ?? $st;
+            $isSelected = $jobId && isset($j['job_id']) && (string) $j['job_id'] === (string) $jobId;
+          @endphp
+          <a href="{{ route('leads', ['job_id' => $j['job_id']]) }}"
+             data-scrape-job-id="{{ $j['job_id'] ?? '' }}"
+             class="bg-white rounded-2xl border border-slate-200 p-5 flex flex-col gap-3 hover:border-blue-300 hover:shadow-sm transition-all no-underline group {{ $isSelected ? 'border-blue-300 ring-2 ring-blue-100' : '' }}">
+            <div class="flex items-center justify-between">
+              <div class="w-7 h-7 rounded-lg bg-[#e8f0fe] flex items-center justify-center">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 2C8.134 2 5 5.134 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.866-3.134-7-7-7z" fill="#EA4335"/>
+                  <circle cx="12" cy="9" r="2.5" fill="white"/>
+                </svg>
+              </div>
+              <span class="text-xs px-2 py-0.5 rounded-full font-medium {{ $badgeClass }}">{{ $badgeLabel }}</span>
+            </div>
+            <div>
+              <div class="font-semibold text-slate-800 text-sm truncate">{{ $j['query'] ?? '—' }}</div>
+              <div class="flex items-center gap-1 text-slate-400 text-xs mt-0.5">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 2C8.134 2 5 5.134 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.866-3.134-7-7-7z"/><circle cx="12" cy="9" r="2.5"/>
+                </svg>
+                {{ $j['location'] ?? 'Sin ubicación' }}
+              </div>
+            </div>
+            <div class="flex items-center justify-between pt-2 border-t border-slate-100">
+              <div class="flex gap-4">
+                <div>
+                  <div class="text-base font-semibold text-slate-800">{{ $j['total'] ?? 0 }}</div>
+                  <div class="text-[10px] text-slate-400">Negocios</div>
+                </div>
+                <div>
+                  <div class="text-base font-semibold text-blue-600">{{ $j['emails_found'] ?? 0 }}</div>
+                  <div class="text-[10px] text-slate-400">Emails</div>
+                </div>
+              </div>
+              <div class="text-xs text-slate-400">
+                {{ !empty($j['started_at']) ? \Carbon\Carbon::parse($j['started_at'])->locale('es')->isoFormat('D MMM YYYY') : '—' }}
+              </div>
+            </div>
+          </a>
+        @endforeach
+      </div>
+    @endif
+  </div>
+
+  <div id="db-leads-section">
+    {{-- Filters --}}
+    <div class="bg-white border border-slate-200 rounded-xl px-4 py-3 mb-4 space-y-3">
     {{-- Row 1: text inputs + actions --}}
     <div class="flex flex-wrap items-center gap-2">
       <input id="filter-name" type="text" placeholder="Buscar por nombre..."
@@ -169,6 +273,8 @@
     </div>
   </div>
 
+  </div>
+
   {{-- Export modal --}}
   <div id="export-modal"
        class="fixed inset-0 z-50 flex items-center justify-center"
@@ -214,22 +320,217 @@
     </div>
   </div>
 
+  <div id="leads-page-data"
+       class="hidden"
+       data-job-id="{{ $jobId ?? '' }}"></div>
+
+  <script type="application/json" id="initial-leads-json">@json($leads ?? [])</script>
+  <script type="application/json" id="jobs-json">@json($jobs ?? [])</script>
+
 @endsection
 
 @push('scripts')
 <script>
 const PAGE_SIZE = 25;
-const JOB_ID = @json($jobId);
+let currentJobId = (document.getElementById('leads-page-data')?.dataset.jobId || '').trim();
+if (!currentJobId) currentJobId = null;
+const DB_INITIAL_VIEW = currentJobId ? 'scrapeos' : 'todos';
+let dbView = DB_INITIAL_VIEW;
+
+function setDbViewUi(view) {
+  const btnTodos = document.getElementById('btn-db-todos');
+  const btnScrapeos = document.getElementById('btn-db-scrapeos');
+  const jobsView = document.getElementById('db-scrapeos-jobs');
+  const placeholder = document.getElementById('db-scrapeos-placeholder');
+  const backBtn = document.getElementById('db-back-to-cards-btn');
+
+  const headerTodos = document.getElementById('db-header-todos');
+  const headerScrape = document.getElementById('db-header-scrape');
+  const leadsSection = document.getElementById('db-leads-section');
+
+  const hasJob = Boolean(currentJobId);
+  const activeTodos = view === 'todos';
+  const activeScrape = view === 'scrapeos';
+
+  // Buttons
+  if (btnTodos) {
+    btnTodos.className = `flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition ${
+      activeTodos ? 'bg-white text-slate-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+    }`;
+  }
+  if (btnScrapeos) {
+    btnScrapeos.className = `flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition ${
+      activeScrape ? 'bg-white text-slate-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+    }`;
+  }
+
+  if (activeTodos) {
+    if (placeholder) placeholder.classList.add('hidden');
+    if (jobsView) jobsView.classList.add('hidden');
+    if (headerTodos) headerTodos.classList.remove('hidden');
+    if (headerScrape) headerScrape.classList.add('hidden');
+    if (backBtn) backBtn.classList.add('hidden');
+    if (leadsSection) leadsSection.classList.remove('hidden');
+    highlightSelectedJobUi(null);
+    return;
+  }
+
+  // scrapeos tab
+  if (!hasJob) {
+    if (placeholder) placeholder.classList.remove('hidden');
+    if (jobsView) jobsView.classList.remove('hidden');
+    if (headerTodos) headerTodos.classList.add('hidden');
+    if (headerScrape) headerScrape.classList.add('hidden');
+    if (backBtn) backBtn.classList.add('hidden');
+    if (leadsSection) leadsSection.classList.add('hidden');
+    highlightSelectedJobUi(null);
+    return;
+  }
+
+  if (placeholder) placeholder.classList.add('hidden');
+  if (jobsView) jobsView.classList.add('hidden');
+  if (headerTodos) headerTodos.classList.add('hidden');
+  if (headerScrape) headerScrape.classList.remove('hidden');
+  if (backBtn) backBtn.classList.remove('hidden');
+  if (leadsSection) leadsSection.classList.remove('hidden');
+
+  highlightSelectedJobUi(currentJobId);
+}
+
+async function reloadLeadsForMode(mode) {
+  if (mode === 'todos') {
+    try {
+      const res = await fetch('/api/leads?limit=500');
+      if (!res.ok) return;
+      allLeads = await res.json();
+      applyFilters();
+    } catch (_) {}
+    return;
+  }
+
+  // scrapeos
+  if (!currentJobId) return;
+  try {
+    const selectedJob = findJobFromPayload(currentJobId);
+    const total = selectedJob?.total;
+    const limit = Number.isFinite(Number(total)) && Number(total) > 0
+      ? Math.min(Number(total), 1000)
+      : 1000;
+
+    const res = await fetch(
+      `/api/leads?job_id=${encodeURIComponent(currentJobId)}&limit=${encodeURIComponent(String(limit))}`
+    );
+    if (!res.ok) return;
+    allLeads = await res.json();
+    applyFilters();
+  } catch (_) {}
+}
+
+function highlightSelectedJobUi(jobId) {
+  const cards = document.querySelectorAll('#db-scrapeos-jobs a[data-scrape-job-id]');
+  cards.forEach((card) => {
+    const cardId = (card.dataset.scrapeJobId || '').trim();
+    const isSelected = Boolean(jobId) && String(cardId) === String(jobId);
+    card.classList.toggle('border-blue-300', isSelected);
+    card.classList.toggle('ring-2', isSelected);
+    card.classList.toggle('ring-blue-100', isSelected);
+  });
+}
+
+function updateJobHeaderUi(job) {
+  const titleEl = document.getElementById('db-job-title');
+  const locationEl = document.getElementById('db-job-location');
+  const dateEl = document.getElementById('db-job-date');
+  const badgeEl = document.getElementById('db-job-status-badge');
+  const totalEl = document.getElementById('db-job-total');
+  const emailsEl = document.getElementById('db-job-emails');
+
+  if (!titleEl || !badgeEl || !totalEl || !emailsEl) return;
+
+  const safeJobId = job?.job_id ? `Job #${job.job_id}` : 'Job #—';
+  const title = job?.query ? String(job.query) : safeJobId;
+  titleEl.textContent = title;
+
+  locationEl && (locationEl.textContent = job?.location ? String(job.location) : 'Sin ubicación');
+
+  const startedAt = job?.started_at || job?.created_at || null;
+  if (dateEl) {
+    if (startedAt) {
+      const d = new Date(startedAt);
+      dateEl.textContent = Number.isNaN(d.getTime())
+        ? String(startedAt)
+        : d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
+    } else {
+      dateEl.textContent = '—';
+    }
+  }
+
+  const classes = { done: 'bg-green-100 text-green-700', failed: 'bg-red-100 text-red-700', running: 'bg-blue-100 text-blue-700' };
+  const labels = { done: 'Completado', failed: 'Error', running: 'En curso' };
+  const status = job?.status || 'done';
+  badgeEl.className = `text-xs px-1.5 py-0.5 rounded-full font-medium inline-block ${classes[status] || 'bg-slate-100 text-slate-600'}`;
+  badgeEl.textContent = labels[status] || String(status);
+
+  totalEl.textContent = Number(job?.total ?? 0);
+  emailsEl.textContent = Number(job?.emails_found ?? 0);
+}
+
+function setUrlJobId(jobId) {
+  try {
+    const url = new URL(window.location.href);
+    if (jobId) url.searchParams.set('job_id', String(jobId));
+    else url.searchParams.delete('job_id');
+    window.history.pushState({}, '', url.pathname + url.search);
+  } catch (_) {}
+}
+
+async function setDbView(view) {
+  if (!view) view = dbView;
+  if (view === dbView) {
+    setDbViewUi(view);
+    // If the user changed the selected scrape while staying in the same tab,
+    // we still need to reload leads.
+    if (view === 'scrapeos') await reloadLeadsForMode('scrapeos');
+    return;
+  }
+
+  setDbViewUi(view);
+  dbView = view;
+
+  if (view === 'todos') await reloadLeadsForMode('todos');
+  if (view === 'scrapeos') await reloadLeadsForMode('scrapeos');
+}
 
 const SOCIAL_DOMAINS = [
   'instagram.com','tiktok.com','facebook.com','twitter.com','x.com',
   'youtube.com','linkedin.com','pinterest.com','snapchat.com','threads.net'
 ];
 
-let allLeads = @json($leads ?? []);
+let allLeads = [];
+try {
+  const payloadEl = document.getElementById('initial-leads-json');
+  allLeads = payloadEl ? JSON.parse(payloadEl.textContent || '[]') : [];
+} catch (_) {
+  allLeads = [];
+}
+let jobsPayload = [];
+try {
+  const jobsEl = document.getElementById('jobs-json');
+  jobsPayload = jobsEl ? JSON.parse(jobsEl.textContent || '[]') : [];
+} catch (_) {
+  jobsPayload = [];
+}
 let filteredLeads = [];
 let currentPage = 1;
 const _leadMap = {};
+
+function findJobFromPayload(jobId) {
+  if (!jobId) return null;
+  const target = String(jobId);
+  return Array.isArray(jobsPayload)
+    ? jobsPayload.find(j => String(j?.job_id ?? j?.id ?? '') === target) || null
+    : null;
+}
 
 // ── Filter state ───────────────────────────────────────────────
 const fstate = { email: '', phone: '', web: '' };
@@ -402,13 +703,7 @@ function applyFilters(keepPage = false) {
 }
 
 async function reloadLeads() {
-  const url = JOB_ID ? `/api/leads?job_id=${JOB_ID}` : '/api/leads';
-  try {
-    const res = await fetch(url);
-    if (!res.ok) return;
-    allLeads = await res.json();
-    applyFilters();
-  } catch (_) {}
+  await reloadLeadsForMode(dbView);
 }
 
 async function deleteLead(id) {
@@ -503,7 +798,8 @@ function confirmExport() {
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
   a.href     = url;
-  a.download = `leads_${JOB_ID || 'todos'}_${Date.now()}.csv`;
+  const exportKey = dbView === 'todos' ? 'todos' : (currentJobId || 'scrape');
+  a.download = `leads_${exportKey}_${Date.now()}.csv`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -714,6 +1010,58 @@ document.getElementById('filter-name')?.addEventListener('input', () => applyFil
 document.getElementById('filter-location')?.addEventListener('input', () => applyFilters());
 document.getElementById('reload-leads-btn')?.addEventListener('click', reloadLeads);
 
+document.getElementById('btn-db-todos')?.addEventListener('click', () => {
+  currentJobId = null;
+  setUrlJobId(null);
+  setDbView('todos');
+});
+document.getElementById('btn-db-scrapeos')?.addEventListener('click', () => setDbView('scrapeos'));
+
+document.getElementById('db-back-to-cards-btn')?.addEventListener('click', async () => {
+  currentJobId = null;
+  setUrlJobId(null);
+  // Volver a la lista de cards sin navegar a `/history`.
+  await setDbView('scrapeos');
+  // Ajuste suave para pantallas con muchos scrapeos.
+  document.getElementById('db-scrapeos-jobs')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
+
+document.getElementById('db-scrapeos-jobs')?.addEventListener('click', (e) => {
+  const link = e.target && e.target.closest ? e.target.closest('a[data-scrape-job-id]') : null;
+  if (!link) return;
+  // Allow modified clicks to behave like normal navigation.
+  if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+  e.preventDefault();
+
+  const jobId = (link.dataset.scrapeJobId || '').trim();
+  if (!jobId) return;
+
+  currentJobId = jobId;
+  setUrlJobId(jobId);
+  setDbView('scrapeos').then(async () => {
+    // 1) Always reload leads for the selected scrape (so pagination matches the real dataset).
+    await reloadLeadsForMode('scrapeos');
+
+    // 2) Update header con query/location usando los datos embebidos de scrapeos.
+    const selectedJob = findJobFromPayload(jobId);
+    if (selectedJob) {
+      updateJobHeaderUi(selectedJob);
+    } else {
+      // Fallback: pedir el detalle del job (por si el job no está en el dataset embebido).
+      try {
+        const res = await fetch(`/api/jobs/${encodeURIComponent(jobId)}`);
+        if (res.ok) {
+          const job = await res.json();
+          updateJobHeaderUi(job);
+        }
+      } catch (_) {}
+    }
+
+    // 3) Scroll to the leads table.
+    document.getElementById('db-leads-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+});
+
 document.querySelectorAll('.fpill').forEach(btn => {
   btn.addEventListener('click', () => setFpill(btn));
 });
@@ -732,6 +1080,7 @@ document.getElementById('lead-modal')?.addEventListener('click', e => {
 });
 
 // ── Init ───────────────────────────────────────────────────────
+setDbViewUi(DB_INITIAL_VIEW);
 applyFilters();
 </script>
 @endpush

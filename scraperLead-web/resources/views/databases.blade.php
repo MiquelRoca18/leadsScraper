@@ -41,8 +41,8 @@
       </div>
     </a>
 
-    {{-- Instagram coming soon --}}
-    <div class="bg-white rounded-2xl border border-slate-200 p-6 flex flex-col gap-4 opacity-60 cursor-not-allowed">
+    {{-- Instagram --}}
+    <a href="{{ route('instagram') }}" class="group bg-white rounded-2xl border border-slate-200 p-6 flex flex-col gap-4 hover:border-purple-400 hover:shadow-md transition-all no-underline">
       <div class="flex items-center gap-3">
         <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-orange-100 to-purple-100 flex items-center justify-center flex-shrink-0">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
@@ -59,13 +59,16 @@
         <div class="font-semibold text-slate-800">Instagram</div>
       </div>
       <div>
-        <div class="text-3xl font-bold text-slate-400">0</div>
+        <div class="text-3xl font-bold text-slate-900">{{ number_format($instagramStats ?? 0) }}</div>
         <div class="text-sm text-slate-400 mt-0.5">Emails encontrados</div>
       </div>
-      <div>
-        <span class="bg-slate-100 text-slate-500 text-xs font-medium px-2.5 py-1 rounded-full">Próximamente</span>
+      <div class="flex items-center gap-1 text-purple-600 text-sm font-medium group-hover:gap-2 transition-all">
+        Ver base de datos
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+        </svg>
       </div>
-    </div>
+    </a>
 
   </div>
 

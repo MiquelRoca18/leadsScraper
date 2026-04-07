@@ -108,6 +108,60 @@ class ApiProxyControllerTest extends TestCase
             ]);
     }
 
+    public function test_proxy_allows_cookie_header_without_rejecting(): void
+    {
+        Http::fake([
+            'http://upstream.test/api/search' => Http::response(['received' => true], 200),
+        ]);
+
+        $body = '{"query":"dentistas","location":"Albacete","max_results":10}';
+
+        $this->withHeaders(['Cookie' => 'sessionid=abc123'])
+            ->call(
+                'POST',
+                '/api/search',
+                [],
+                [],
+                [],
+                ['CONTENT_TYPE' => 'application/json'],
+                $body
+            )
+            ->assertOk()
+            ->assertJson(['received' => true]);
+
+        Http::assertSent(function ($request) use ($body) {
+            return $request->method() === 'POST'
+                && $request->url() === 'http://upstream.test/api/search'
+                && $request->body() === $body;
+        });
+    }
+
+    public function test_proxy_allows_jobs_path_with_parameter(): void
+    {
+        Http::fake([
+            'http://upstream.test/api/jobs/*' => Http::response(['ok' => true], 200),
+        ]);
+
+        $this->getJson('/api/jobs/job-123')
+            ->assertOk()
+            ->assertJson(['ok' => true]);
+
+        Http::assertSent(function ($request) {
+            return $request->method() === 'GET'
+                && $request->url() === 'http://upstream.test/api/jobs/job-123';
+        });
+    }
+
+    public function test_is_allowed_path_matches_jobs_parameter(): void
+    {
+        $controller = new \App\Http\Controllers\ApiProxyController();
+        $method = new \ReflectionMethod(\App\Http\Controllers\ApiProxyController::class, 'isAllowedPath');
+        $method->setAccessible(true);
+
+        $this->assertTrue($method->invoke($controller, 'jobs/job-123'));
+        $this->assertFalse($method->invoke($controller, 'jobs/'));
+    }
+
     public function test_proxy_returns_consistent_502_on_upstream_timeout_or_exception(): void
     {
         Http::fake(function () {

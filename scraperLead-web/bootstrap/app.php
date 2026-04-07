@@ -11,7 +11,12 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->validateCsrfTokens(except: ['api/search', 'api/leads/*']);
+        $middleware->validateCsrfTokens(except: [
+            'api/search',
+            'api/leads/*',
+            'api/instagram/search',
+            'api/instagram/diagnose',
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

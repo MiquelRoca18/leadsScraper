@@ -6,18 +6,27 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Throwable;
 
-class ApiProxyController extends Controller
+/**
+ * Proxy controller for InstaLeads backend (http://localhost:8002).
+ *
+ * Same security pattern as ApiProxyController but targets the Instagram scraper service.
+ * Handles all /api/instagram/* routes from the frontend.
+ */
+class InstaLeadsProxyController extends Controller
 {
     private const ALLOWED_METHODS = ['GET', 'POST', 'DELETE'];
     private const ALLOWED_HEADERS = ['accept', 'content-type', 'x-requested-with', 'x-csrf-token', 'x-xsrf-token'];
     private const ALLOWED_PATH_PATTERNS = [
+        'instagram/health',
+        'instagram/debug/last',
+        'instagram/diagnose',
+        'instagram/profile/{username}',
+        'instagram/search',
+        'instagram/jobs',
+        'instagram/jobs/{jobId}',
+        'instagram/leads',
+        'instagram/export/{jobId}',
         'proxy/status',
-        'proxy/capacity',
-        'search',
-        'leads',
-        'leads/{leadId}',
-        'jobs/{jobId}',
-        'export/{jobId}',
     ];
 
     public function proxy(Request $request)
@@ -40,9 +49,8 @@ class ApiProxyController extends Controller
         foreach ($request->headers->all() as $name => $_) {
             $lower = strtolower($name);
 
-            // Permitimos headers "contextuales" que suelen venir del navegador/reverse proxy
-            // (y que además NO reenviamos al upstream por whitelist), para que el proxy
-            // no rechace llamadas legítimas con cookies (p.ej. sesión/XSRF).
+            // Mismo patrón que ApiProxyController: aceptar cookies/contexto local
+            // para que el proxy no rompa llamadas del navegador, pero nunca reenviar.
             if ($lower === 'authorization' || $lower === 'cookie' || str_starts_with($lower, 'x-forwarded-')) {
                 continue;
             }
@@ -52,9 +60,9 @@ class ApiProxyController extends Controller
             }
         }
 
-        $apiUrl = rtrim((string) config('services.mapleads.api_url'), '/');
+        $apiUrl = rtrim((string) config('services.instaleads.api_url'), '/');
         if (blank($apiUrl)) {
-            return response()->json(['message' => 'Upstream API unavailable'], 502);
+            return response()->json(['message' => 'InstaLeads API unavailable'], 502);
         }
 
         $targetUrl = "{$apiUrl}/api/{$resolvedPath}";
@@ -78,11 +86,11 @@ class ApiProxyController extends Controller
                 'DELETE' => $pendingRequest->delete($targetUrl),
             };
         } catch (Throwable) {
-            return response()->json(['message' => 'Upstream API unavailable'], 502);
+            return response()->json(['message' => 'InstaLeads API unavailable'], 502);
         }
 
         if ($response->failed()) {
-            return response()->json(['message' => 'Upstream API unavailable'], 502);
+            return response()->json(['message' => 'InstaLeads API unavailable'], 502);
         }
 
         return response($response->body(), $response->status())
@@ -100,15 +108,7 @@ class ApiProxyController extends Controller
 
     private function isAllowedPath(string $resolvedPath): bool
     {
-        // Evitar que patrones tipo `jobs/*` acepten el componente vacío (porque `*`
-        // puede hacer match de longitud 0), p.ej. `jobs/` sin id.
-        if (str_ends_with($resolvedPath, '/')) {
-            return false;
-        }
-
         foreach (self::ALLOWED_PATH_PATTERNS as $pattern) {
-            // Igual que InstaLeadsProxyController: usar `fnmatch` es más robusto
-            // con variaciones en el `resolvedPath` (p.ej. `{jobId}` aún sin resolver).
             $wildcard = (string) preg_replace('/\{[^}]+\}/', '*', $pattern);
             if (fnmatch($wildcard, $resolvedPath)) {
                 return true;

@@ -60,7 +60,7 @@
     </nav>
 
     {{-- Proxy widget --}}
-    <x-proxy-status :proxy-status="($proxyStatus ?? [])" />
+    <x-proxy-status :proxy-status="($proxyStatus ?? [])" :hiddenWhenEmpty="false" />
   </aside>
 
   {{-- ── Main ── --}}

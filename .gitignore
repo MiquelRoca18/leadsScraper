@@ -1,1 +1,36 @@
+# Directorios del proyecto
 /docs
+/instaleads
+/.cursor
+/.venv-tvly
+
+# Ambiente virtual y paquetes
+venv/
+.venv/
+node_modules/
+vendor/
+
+# Archivos de entorno
+.env
+.env.local
+.env.*.local
+
+# Bases de datos
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs y caché
+*.log
+.pytest_cache/
+__pycache__/
+.phpunit.result.cache
+
+# IDE
+.vscode/
+.idea/
+.DS_Store
+
+# Sistema
+Thumbs.db
+.DS_Store
