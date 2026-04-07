@@ -39,10 +39,10 @@ INSTALEADS_API_URL=http://localhost:8002
 PORT=8081
 ```
 
-Después reinicia la app con `run_mapleads.bat`.
+Después reinicia la app con `start_mapleads.bat`.
 
 ---
 
 ## Distribución
 
-Puedes copiar la carpeta `dist/MapLeads-Frontend` a otros ordenadores y ejecutar `run_mapleads.bat` directamente, sin necesidad de compilar de nuevo.
+Puedes copiar todo el proyecto a otros ordenadores. Solo necesitan ejecutar `build_exe.bat` una vez y después usar `start_mapleads.bat` siempre.

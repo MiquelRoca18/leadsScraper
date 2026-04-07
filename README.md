@@ -62,22 +62,21 @@ PORT=8081
 
 ## Arrancar el proyecto
 
+### Windows
+
+Doble clic en **`start_mapleads.bat`** (raíz del proyecto). Inicia el backend y el frontend juntos automáticamente.
+
+> Antes de usarlo por primera vez, compila el frontend: entra en `scraperLead-web` y ejecuta `build_exe.bat`.
+
+### Mac/Linux
+
 Abre **2 terminales**:
 
 **Terminal 1 — Backend:**
-
-Mac/Linux:
 ```bash
 cd mapleads
 source venv/bin/activate
-uvicorn backend.main:app --reload --port 8001
-```
-
-Windows:
-```cmd
-cd mapleads
-venv\Scripts\activate
-uvicorn backend.main:app --reload --port 8001
+uvicorn backend.main:app --port 8001
 ```
 
 **Terminal 2 — Frontend:**
