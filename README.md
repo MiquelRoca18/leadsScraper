@@ -7,8 +7,6 @@ Herramienta para extraer emails de negocios locales desde Google Maps.
 ## Requisitos
 
 - Python 3.11+
-- PHP 8.2+ y Composer
-- Node.js 18+
 
 ---
 
@@ -26,29 +24,26 @@ pip install -r requirements.txt
 
 > Los proxies son de [Webshare](https://www.webshare.io/). Obtén tu lista desde el dashboard → Proxy List.
 
-### 2. Frontend (Laravel)
+### 2. Frontend (FastAPI)
 
 ```bash
 cd scraperLead-web
-composer install
-npm install
-cp .env.example .env
-php artisan key:generate
-php artisan migrate
+pip install -r requirements.txt
 ```
 
-Añade al `.env` de Laravel:
+Edita el `.env` con las URLs de los backends:
 
 ```env
-APP_URL=http://localhost:8081
 MAPLEADS_API_URL=http://localhost:8001
+INSTALEADS_API_URL=http://localhost:8002
+PORT=8081
 ```
 
 ---
 
 ## Arrancar el proyecto
 
-Abre **3 terminales**:
+Abre **2 terminales**:
 
 **Terminal 1 — Backend:**
 ```bash
@@ -57,19 +52,13 @@ source venv/bin/activate
 uvicorn backend.main:app --reload --port 8001
 ```
 
-**Terminal 2 — Assets (Vite):**
+**Terminal 2 — Frontend:**
 ```bash
 cd scraperLead-web
-npm run dev
+python launcher.py
 ```
 
-**Terminal 3 — Frontend:**
-```bash
-cd scraperLead-web
-php artisan serve --port 8081
-```
-
-Abre el navegador en **http://localhost:8081**
+El navegador se abrirá automáticamente en **http://localhost:8081**
 
 ---
 
