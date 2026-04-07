@@ -12,8 +12,18 @@ import threading
 import uvicorn
 
 # Cambiar al directorio de la aplicación
-app_dir = os.path.dirname(os.path.abspath(__file__))
+try:
+    # Si se ejecuta como .exe, __file__ podría no estar disponible
+    app_dir = os.path.dirname(os.path.abspath(__file__))
+except NameError:
+    # Si estamos en un .exe, usa el directorio actual
+    app_dir = os.getcwd()
+
 os.chdir(app_dir)
+
+# Asegurar que el directorio actual está en sys.path para importar main
+if app_dir not in sys.path:
+    sys.path.insert(0, app_dir)
 
 # Variables
 HOST = "127.0.0.1"
