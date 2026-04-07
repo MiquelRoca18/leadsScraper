@@ -13,17 +13,16 @@ import uvicorn
 
 # Cambiar al directorio de la aplicación
 try:
-    # Si se ejecuta como .exe, __file__ podría no estar disponible
     app_dir = os.path.dirname(os.path.abspath(__file__))
 except NameError:
-    # Si estamos en un .exe, usa el directorio actual
     app_dir = os.getcwd()
 
 os.chdir(app_dir)
 
-# Asegurar que el directorio actual está en sys.path para importar main
 if app_dir not in sys.path:
     sys.path.insert(0, app_dir)
+
+from main import app  # noqa: E402 — import after chdir so templates/static resolve
 
 # Variables
 HOST = "127.0.0.1"
@@ -57,7 +56,7 @@ if __name__ == "__main__":
     # Iniciar uvicorn
     try:
         uvicorn.run(
-            "main:app",
+            app,
             host=HOST,
             port=PORT,
             log_level="info",
