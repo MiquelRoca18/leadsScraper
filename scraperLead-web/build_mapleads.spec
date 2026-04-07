@@ -3,16 +3,14 @@
 # Build with: pyinstaller build_mapleads.spec
 
 import sys
+import os
 from pathlib import Path
 
 block_cipher = None
 
-# Determine base path
-base_path = Path(__file__).parent
-
 a = Analysis(
     ['launcher.py'],
-    pathex=[str(base_path)],
+    pathex=[os.getcwd()],
     binaries=[],
     datas=[
         ('templates', 'templates'),
