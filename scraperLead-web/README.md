@@ -1,58 +1,128 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# MapLeads - Frontend
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Frontend de Scraper Lead — construido con **FastAPI + Jinja2**.
 
-## About Laravel
+## Requisitos
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- Python 3.11+ (debe estar instalado en tu sistema)
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Instalación Rápida (Usuarios No-Técnicos)
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+### Opción 1: Usando el Ejecutable (.exe) — Recomendado
 
-## Learning Laravel
+**Paso 1: Generar el ejecutable**
+1. Abre `PowerShell` o `CMD` en este directorio
+2. Ejecuta:
+   ```bash
+   python -m pip install -r requirements.txt
+   pyinstaller build_mapleads.spec
+   ```
+3. Espera a que termine (puede tardar 2-5 minutos)
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+**Paso 2: Ejecutar la aplicación**
+- Haz doble clic en `run_mapleads.bat`
+- La aplicación se abrirá automáticamente en tu navegador en `http://localhost:8081`
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+**Paso 3: Detener la aplicación**
+- Presiona `CTRL+C` en la ventana de consola o ciérrala
 
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
+> El ejecutable se genera una única vez. Después puedes compartir `run_mapleads.bat` a otros usuarios sin necesidad de compilar de nuevo.
 
-## Agentic Development
+### Opción 2: Ejecutar en Desarrollo
 
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
-
+**Instalación:**
 ```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+pip install -r requirements.txt
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+**Configuración:**
+Edita el archivo `.env` con las URLs de los backends:
 
-## Contributing
+```env
+MAPLEADS_API_URL=http://localhost:8001
+INSTALEADS_API_URL=http://localhost:8002
+PORT=8081
+```
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+**Arranque:**
 
-## Code of Conduct
+Con recarga automática en desarrollo:
+```bash
+uvicorn main:app --reload --port 8081
+```
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+O usando el launcher (abre el navegador automáticamente):
+```bash
+python launcher.py
+```
 
-## Security Vulnerabilities
+Abre `http://localhost:8081` en tu navegador.
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+## Estructura
 
-## License
+```
+scraperLead-web/
+├── launcher.py              # Script para iniciar la app (abre navegador)
+├── main.py                  # App FastAPI: rutas, handlers y proxy
+├── build_mapleads.spec      # Configuración de PyInstaller
+├── build_exe.bat            # Script batch para compilar .exe
+├── run_mapleads.bat         # Script batch para ejecutar .exe
+├── requirements.txt         # Dependencias Python
+├── .env                     # Variables de entorno
+├── templates/               # HTML con Jinja2
+│   ├── base.html           # Layout base (sidebar + nav)
+│   ├── home.html           # Dashboard
+│   ├── search.html         # Búsqueda en Google Maps
+│   ├── leads.html          # Base de datos de leads
+│   ├── history.html        # Historial de búsquedas
+│   ├── databases.html      # Resumen de bases de datos
+│   └── instagram.html      # Extracción de Instagram
+└── static/
+    └── js/                  # Módulos JavaScript
+        ├── app.js          # Entry point
+        ├── bootstrap.js
+        ├── lib/
+        │   ├── dom-utils.js
+        │   └── proxy-state.js
+        └── modules/
+            ├── search-form.js
+            ├── instagram-form.js
+            └── proxy-status.js
+```
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+## Solución de Problemas
+
+### El .exe no se abre / dice que falta un módulo
+- Asegúrate de que ejecutaste `pyinstaller build_mapleads.spec` completamente
+- Si ves errores, ejecuta nuevamente el script batch
+
+### La aplicación se abre pero no carga el contenido
+- Verifica que los backends están corriendo:
+  - MapLeads API: `http://localhost:8001`
+  - InstaLeads API: `http://localhost:8002`
+- Edita `.env` con las URLs correctas si es necesario
+
+### El navegador no se abre automáticamente
+- Abre manualmente `http://localhost:8081` en tu navegador
+- El servidor estará disponible en ese puerto
+
+## Para Desarrolladores
+
+**Desarrollo con recarga automática:**
+```bash
+uvicorn main:app --reload --port 8081
+```
+
+**Formateo de código:**
+```bash
+pip install black
+black main.py launcher.py
+```
+
+**Compilar .exe:**
+```bash
+pip install pyinstaller
+pyinstaller build_mapleads.spec
+```
+
+El ejecutable se genera en `dist/MapLeads-Frontend/MapLeads-Frontend.exe`
