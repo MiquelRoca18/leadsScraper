@@ -31,9 +31,17 @@ Sigue estos pasos para instalar y ejecutar MapLeads en tu computadora Windows.
    - Cuando termine, verás "Successfully generated"
 
 2. **Verifica que se creó correctamente**
-   - Deberías ver una carpeta nueva llamada `dist`
-   - Dentro de `dist`, verás `MapLeads-Frontend`
-   - Dentro de esa carpeta está `MapLeads-Frontend.exe`
+   - Deberías ver una carpeta nueva llamada `dist` en el directorio actual
+   - Estructura completa:
+     ```
+     scraperLead-web/
+     ├── dist/
+     │   └── MapLeads-Frontend/
+     │       └── MapLeads-Frontend.exe  ← Tu aplicación
+     ├── run_mapleads.bat
+     ├── main.py
+     └── ...
+     ```
 
 ### Paso 3: Ejecutar la Aplicación
 

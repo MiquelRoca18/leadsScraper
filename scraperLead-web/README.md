@@ -18,15 +18,17 @@ Frontend de Scraper Lead — construido con **FastAPI + Jinja2**.
    pyinstaller build_mapleads.spec
    ```
 3. Espera a que termine (puede tardar 2-5 minutos)
+4. Se creará una carpeta `dist/MapLeads-Frontend/` con el ejecutable
 
 **Paso 2: Ejecutar la aplicación**
-- Haz doble clic en `run_mapleads.bat`
+- **Opción A (Fácil):** Haz doble clic en `run_mapleads.bat`
+- **Opción B (Manual):** Ve a `dist/MapLeads-Frontend/` y haz doble clic en `MapLeads-Frontend.exe`
 - La aplicación se abrirá automáticamente en tu navegador en `http://localhost:8081`
 
 **Paso 3: Detener la aplicación**
 - Presiona `CTRL+C` en la ventana de consola o ciérrala
 
-> El ejecutable se genera una única vez. Después puedes compartir `run_mapleads.bat` a otros usuarios sin necesidad de compilar de nuevo.
+> **Nota:** El ejecutable se genera una única vez. Después de eso, solo necesitas hacer doble clic en `run_mapleads.bat` para ejecutar. Puedes compartir toda la carpeta `dist/MapLeads-Frontend/` a otros usuarios sin necesidad de compilar de nuevo.
 
 ### Opción 2: Ejecutar en Desarrollo
 
