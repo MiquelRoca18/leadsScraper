@@ -22,6 +22,7 @@ python3 -m venv venv
 source venv/bin/activate
 cp .env.example .env
 pip install -r requirements.txt
+```
 
 > Los proxies son de [Webshare](https://www.webshare.io/). Obtén tu lista desde el dashboard → Proxy List.
 
