@@ -1,6 +1,7 @@
 import asyncio
 import os
 from datetime import datetime, timezone
+from urllib.parse import urlparse
 
 import httpx
 from dotenv import load_dotenv
@@ -242,7 +243,7 @@ async def databases(request: Request):
 
 
 @app.get("/instagram")
-async def instagram(request: Request):
+async def instagram(request: Request, from_page: str | None = Query(default=None, alias="from")):
     health, health_state = await safe_fetch(f"{INSTALEADS_URL}/api/instagram/health", timeout=5.0)
     health = health or {"status": "unknown"}
     state = "ok"
@@ -260,12 +261,48 @@ async def instagram(request: Request):
         jobs, _ = await safe_fetch(f"{INSTALEADS_URL}/api/instagram/jobs", {"limit": 3}, timeout=5.0)
         recent_jobs = jobs or []
 
+    database_view = (from_page or "").strip().lower() == "databases"
+
     return templates.TemplateResponse("instagram.html", {
         "request": request,
         "health": health,
         "recent_jobs": recent_jobs,
         "state": state,
         "message": message,
+        "database_view": database_view,
+    })
+
+
+@app.get("/instagram/leads")
+async def instagram_leads(request: Request, job_id: str | None = Query(default=None)):
+    leads_limit = 1000
+    if job_id:
+        job_data, _ = await safe_fetch(f"{INSTALEADS_URL}/api/instagram/jobs/{job_id}", timeout=8.0)
+        if isinstance(job_data, dict) and isinstance(job_data.get("total"), (int, float)):
+            leads_limit = max(1, min(int(job_data["total"]), 2000))
+
+    leads_params: dict[str, str | int] = {"limit": leads_limit}
+    if job_id:
+        leads_params["job_id"] = job_id
+
+    leads_data, leads_state = await safe_fetch(
+        f"{INSTALEADS_URL}/api/instagram/leads",
+        params=leads_params,
+        timeout=15.0,
+    )
+    jobs_data, jobs_state = await safe_fetch(
+        f"{INSTALEADS_URL}/api/instagram/jobs",
+        params={"limit": 200},
+        timeout=10.0,
+    )
+
+    return templates.TemplateResponse("instagram_leads.html", {
+        "request": request,
+        "job_id": job_id,
+        "leads": leads_data or [],
+        "jobs": jobs_data or [],
+        "leads_state": leads_state,
+        "jobs_state": jobs_state,
     })
 
 
@@ -391,6 +428,80 @@ async def ig_leads(request: Request):
 @app.get("/api/instagram/export/{job_id}")
 async def ig_export(job_id: str, request: Request):
     return await _proxy_to(f"{INSTALEADS_URL}/api/instagram/export/{job_id}", request)
+
+
+@app.post("/api/instagram/login")
+async def ig_login(request: Request):
+    return await _proxy_to(f"{INSTALEADS_URL}/api/instagram/login", request)
+
+
+@app.get("/api/instagram/session")
+async def ig_session_get(request: Request):
+    return await _proxy_to(f"{INSTALEADS_URL}/api/instagram/session", request)
+
+
+@app.delete("/api/instagram/session")
+async def ig_session_delete(request: Request):
+    return await _proxy_to(f"{INSTALEADS_URL}/api/instagram/session", request)
+
+
+@app.get("/api/instagram/limits")
+async def ig_limits(request: Request):
+    return await _proxy_to(f"{INSTALEADS_URL}/api/instagram/limits", request)
+
+
+@app.get("/api/instagram/accounts")
+async def ig_accounts_list(request: Request):
+    return await _proxy_to(f"{INSTALEADS_URL}/api/instagram/accounts", request)
+
+
+@app.post("/api/instagram/accounts")
+async def ig_accounts_add(request: Request):
+    return await _proxy_to(f"{INSTALEADS_URL}/api/instagram/accounts", request)
+
+
+@app.delete("/api/instagram/accounts/{username}")
+async def ig_accounts_remove(username: str, request: Request):
+    return await _proxy_to(f"{INSTALEADS_URL}/api/instagram/accounts/{username}", request)
+
+
+
+@app.get("/api/instagram/avatar")
+async def ig_avatar(url: str):
+    """
+    Proxy avatar images from Instagram CDN to avoid hotlink/referrer blocks.
+    """
+    try:
+        parsed = urlparse(url)
+        if parsed.scheme not in {"http", "https"}:
+            return JSONResponse({"message": "Invalid avatar URL"}, status_code=400)
+        host = (parsed.hostname or "").lower()
+        if not host.endswith("fbcdn.net"):
+            return JSONResponse({"message": "Avatar host not allowed"}, status_code=400)
+    except Exception:
+        return JSONResponse({"message": "Invalid avatar URL"}, status_code=400)
+
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/131.0.0.0 Safari/537.36"
+        ),
+        "Referer": "https://www.instagram.com/",
+        "Accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+    }
+
+    async with httpx.AsyncClient() as client:
+        try:
+            r = await client.get(url, headers=headers, timeout=15.0)
+        except Exception:
+            return JSONResponse({"message": "Could not fetch avatar"}, status_code=502)
+
+    if r.status_code != 200:
+        return JSONResponse({"message": "Avatar unavailable"}, status_code=502)
+
+    media_type = r.headers.get("content-type", "image/jpeg")
+    return Response(content=r.content, media_type=media_type)
 
 
 if __name__ == "__main__":

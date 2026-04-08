@@ -39,7 +39,9 @@
 
     <!-- Global alert -->
     <div id="ig-alert" class="hidden mb-4"></div>
+    <div id="ig-limit-alert" class="hidden mb-4 rounded-xl border px-4 py-3 text-sm"></div>
 
+    <div id="ig-scraper-sections" class="{% if database_view %}hidden{% endif %}">
     <!-- Status row -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
       <div class="bg-white border border-slate-200 rounded-xl px-4 py-3">
@@ -97,7 +99,7 @@
       </div>
       <p class="text-xs text-slate-500 mb-4">Busca perfiles de Instagram por nicho y ubicación usando Google. No requiere cuenta de Instagram.</p>
 
-      <div class="grid grid-cols-1 md:grid-cols-[1fr_1fr_140px_140px] gap-3 mb-4">
+      <div class="grid grid-cols-1 md:grid-cols-[1fr_1fr_180px] gap-3 mb-4">
         <div>
           <label for="ig-niche" class="block text-xs font-semibold tracking-widest text-slate-400 uppercase mb-2">Nicho</label>
           <input id="ig-niche" type="text" placeholder="fotógrafo, nutricionista..."
@@ -107,12 +109,6 @@
           <label for="ig-location" class="block text-xs font-semibold tracking-widest text-slate-400 uppercase mb-2">Ubicación</label>
           <input id="ig-location" type="text" placeholder="Valencia, Madrid..."
             class="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-400 transition" />
-        </div>
-        <div>
-          <label for="ig-dorking-max" class="block text-xs font-semibold tracking-widest text-slate-400 uppercase mb-2">Máx. perfiles</label>
-          <input id="ig-dorking-max" type="number" min="1" max="150" value="50"
-            title="Máximo seguro: 150/día para evitar bloqueos"
-            class="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-400 transition" />
         </div>
         <div>
           <label for="ig-dorking-email-goal" class="block text-xs font-semibold tracking-widest text-slate-400 uppercase mb-2">Emails objetivo</label>
@@ -196,7 +192,7 @@
         <!-- Profile preview -->
         <div id="ig-profile-preview" class="hidden bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 mb-4">
           <div class="flex items-center gap-3">
-            <img id="ig-profile-avatar" src="" alt="Perfil"
+            <img id="ig-profile-avatar" src="about:blank" alt="Perfil"
               class="w-11 h-11 rounded-full object-cover border border-slate-200 bg-slate-100" loading="lazy" />
             <div class="min-w-0">
               <p id="ig-profile-username" class="text-sm font-semibold text-slate-800 truncate"></p>
@@ -205,18 +201,12 @@
           </div>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-[1fr_160px_160px_160px] gap-3 mb-4">
+        <div class="grid grid-cols-1 md:grid-cols-[1fr_180px_160px] gap-3 mb-4">
           <div>
             <label for="ig-target" class="block text-xs font-semibold tracking-widest text-slate-400 uppercase mb-2">Cuenta objetivo</label>
             <input id="ig-target" type="text" placeholder="@nikerunning"
               class="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500 transition" />
             <p class="mt-1 text-xs text-slate-400">Username del perfil cuyos seguidores quieres extraer.</p>
-          </div>
-          <div>
-            <label for="ig-followers-max" class="block text-xs font-semibold tracking-widest text-slate-400 uppercase mb-2">Máx. seguidores</label>
-            <input id="ig-followers-max" type="number" min="1" max="80" value="50"
-              title="Máximo seguro: 80/día para evitar bloqueos"
-              class="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500 transition" />
           </div>
           <div>
             <label for="ig-followers-email-goal" class="block text-xs font-semibold tracking-widest text-slate-400 uppercase mb-2">Emails objetivo</label>
@@ -252,15 +242,87 @@
           </div>
         </div>
       </div>
+
+      <!-- Account pool panel -->
+      <div class="bg-white border border-slate-200 rounded-2xl p-6">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h3 class="text-sm font-semibold text-slate-800">Pool de Cuentas</h3>
+            <p class="text-xs text-slate-500 mt-0.5">Añade múltiples cuentas para escalar el scraping (cada cuenta = +150 perfiles/día)</p>
+          </div>
+          <button id="ig-pool-toggle-btn" type="button"
+            class="text-xs px-3 py-1.5 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition">
+            Añadir cuenta
+          </button>
+        </div>
+
+        <!-- Add account form (hidden by default) -->
+        <div id="ig-pool-add-form" class="hidden mb-4 p-4 bg-slate-50 rounded-xl border border-slate-200">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+            <div>
+              <label class="block text-xs font-semibold tracking-widest text-slate-500 uppercase mb-1.5">Usuario</label>
+              <input id="ig-pool-username" type="text" placeholder="cuenta_secundaria"
+                class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 transition" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold tracking-widest text-slate-500 uppercase mb-1.5">Contraseña</label>
+              <input id="ig-pool-password" type="password" placeholder="••••••••"
+                class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 transition" />
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="block text-xs font-semibold tracking-widest text-slate-500 uppercase mb-1.5">Proxy URL (opcional)</label>
+            <input id="ig-pool-proxy" type="text" placeholder="http://user:pass@host:port"
+              class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 transition" />
+          </div>
+          <div class="flex items-center gap-2">
+            <button id="ig-pool-add-btn" type="button"
+              class="px-4 py-2 bg-purple-600 text-white text-xs font-semibold rounded-lg hover:bg-purple-700 transition">
+              Iniciar sesión y añadir
+            </button>
+            <button id="ig-pool-cancel-btn" type="button"
+              class="px-4 py-2 border border-slate-200 text-slate-600 text-xs rounded-lg hover:bg-slate-50 transition">
+              Cancelar
+            </button>
+            <span id="ig-pool-add-status" class="text-xs text-slate-500 ml-2"></span>
+          </div>
+        </div>
+
+        <!-- Accounts table -->
+        <div id="ig-pool-accounts-list">
+          <p id="ig-pool-empty" class="text-xs text-slate-400 text-center py-4">
+            Sin cuentas en el pool. Añade cuentas para aumentar el throughput.
+          </p>
+          <table id="ig-pool-table" class="hidden w-full text-sm">
+            <thead class="bg-slate-50 border-b border-slate-100">
+              <tr>
+                <th class="text-left text-xs font-semibold text-slate-500 uppercase tracking-wide px-3 py-2">Usuario</th>
+                <th class="text-left text-xs font-semibold text-slate-500 uppercase tracking-wide px-3 py-2">Estado</th>
+                <th class="text-left text-xs font-semibold text-slate-500 uppercase tracking-wide px-3 py-2">Req/hora</th>
+                <th class="text-left text-xs font-semibold text-slate-500 uppercase tracking-wide px-3 py-2">Proxy</th>
+                <th class="px-3 py-2"></th>
+              </tr>
+            </thead>
+            <tbody id="ig-pool-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
     </div>
 
     <!-- Results section -->
     <div class="flex items-start justify-between gap-4 mb-4 flex-wrap">
       <div>
         <h2 class="text-lg font-bold text-slate-800">Instagram Leads</h2>
-        <p class="text-slate-500 text-sm">Visualiza leads agregados o por scrapeo.</p>
+        <p class="text-slate-500 text-sm">
+          {% if database_view %}
+            Visualiza todos los leads disponibles de Instagram.
+          {% else %}
+            Visualiza leads agregados o por scrapeo.
+          {% endif %}
+        </p>
       </div>
-      <div class="flex bg-slate-100 rounded-lg p-1 gap-1" id="ig-view-toggle">
+      <div class="flex bg-slate-100 rounded-lg p-1 gap-1 {% if database_view %}hidden{% endif %}" id="ig-view-toggle">
         <button id="ig-btn-todos" type="button"
           class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition bg-white text-slate-700 shadow-sm">
           Todos
