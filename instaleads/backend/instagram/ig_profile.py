@@ -28,11 +28,34 @@ async def save_profile_data(
     ig_health.record_success()
 
     email = data.get("email")
+    email_source = data.get("email_source")
+
+    # If no email in bio, try web enrichment via bio_url
+    if not email and data.get("bio_url"):
+        from backend.instagram.ig_enrichment import enrich_email_from_bio_url
+        enriched = await enrich_email_from_bio_url(data["bio_url"])
+        if enriched:
+            email = enriched
+            email_source = "website"
+            logger.debug("Email enriched from website for %s: %s", username, email)
+
+    # If still no email, try cross-platform search (Hunter.io, Snov.io, Google dork)
+    if not email:
+        from backend.instagram.ig_cross_platform import search_cross_platform
+        cross_email = await search_cross_platform(username, data.get("bio_url"))
+        if cross_email:
+            email = cross_email
+            email_source = "cross_platform"
+            logger.debug("Email enriched via cross-platform for %s: %s", username, email)
+
     if not email:
         await database.save_skipped(username, reason="no_email")
         await deduplicator.mark_seen(username)
-        logger.debug("No email found for %s — skipped", username)
+        logger.debug("No email found for %s (bio + website checked) — skipped", username)
         return None
+
+    # Inject enriched email/source back into data dict for save_lead
+    data = {**data, "email": email, "email_source": email_source}
 
     await database.save_lead(
         job_id=job_id,

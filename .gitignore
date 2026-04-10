@@ -1,6 +1,5 @@
 # Directorios del proyecto
 /docs
-/instaleads
 /.cursor
 /.venv-tvly
 
@@ -14,6 +13,9 @@ vendor/
 .env
 .env.local
 .env.*.local
+instaleads/data/session.json
+instaleads/data/session.json.key
+instaleads/data/sessions/
 
 # Bases de datos
 *.db
@@ -34,3 +36,6 @@ __pycache__/
 # Sistema
 Thumbs.db
 .DS_Store
+
+*.md
+!README.md

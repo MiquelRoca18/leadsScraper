@@ -12,6 +12,7 @@ Rate limit: separate rolling-hour window (external sites, not Instagram quota).
 import asyncio
 import json
 import logging
+import random
 import re
 import time
 from collections import deque
@@ -28,7 +29,16 @@ BLOCKED_LOCAL_PARTS = {"no-reply", "noreply", "donotreply"}
 BLOCKED_DOMAINS = {"example.com", "test.com", "invalid", "localhost"}
 
 # Contact sub-pages to check when the main page has no email
-_CONTACT_PATHS = ["/contact", "/contacto", "/about", "/sobre-mi", "/about-us"]
+_CONTACT_PATHS = ["/contact", "/contacto", "/about", "/sobre-mi", "/about-us", "/en/contact", "/es/contacto"]
+
+# User-Agents for website enrichment (rotating like dorking)
+_USER_AGENTS = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:132.0) Gecko/20100101 Firefox/132.0",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15",
+]
 
 
 class EnrichmentLimiter:
@@ -53,14 +63,15 @@ class EnrichmentLimiter:
 
 _limiter = EnrichmentLimiter(settings.enrichment_max_fetches_per_hour)
 
-_HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/131.0.0.0 Safari/537.36"
-    ),
-    "Accept": "text/html,application/xhtml+xml",
-}
+def _get_headers() -> dict:
+    """Return headers with rotated User-Agent."""
+    return {
+        "User-Agent": random.choice(_USER_AGENTS),
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "es-ES,es;q=0.9,en;q=0.8",
+        "Accept-Encoding": "gzip, deflate",
+        "Referer": "https://www.google.com/",
+    }
 
 
 def _normalize_url(url: str | None) -> str | None:
@@ -114,6 +125,7 @@ def _extract_from_structured_data(html: str) -> list[str]:
     - <a href="mailto:..."> links
     - <script type="application/ld+json"> JSON-LD blocks
     - <meta> tags with email content
+    - Text patterns like "email:" and "contact:"
     """
     emails: list[str] = []
 
@@ -134,14 +146,14 @@ def _extract_from_structured_data(html: str) -> list[str]:
             # JSON-LD can be a single object or a list
             items = data if isinstance(data, list) else [data]
             for item in items:
-                for field in ("email", "contactEmail", "contactPoint"):
+                for field in ("email", "contactEmail", "contactPoint", "telephone", "url"):
                     value = item.get(field)
-                    if isinstance(value, str):
+                    if isinstance(value, str) and "@" in value:
                         normalized = _normalize_email(value)
                         if normalized and normalized not in emails:
                             emails.append(normalized)
                     elif isinstance(value, dict):
-                        for sub_field in ("email",):
+                        for sub_field in ("email", "emailAddress"):
                             sub_value = value.get(sub_field, "")
                             if isinstance(sub_value, str):
                                 normalized = _normalize_email(sub_value)
@@ -160,6 +172,16 @@ def _extract_from_structured_data(html: str) -> list[str]:
         if normalized and normalized not in emails:
             emails.append(normalized)
 
+    # Search for patterns like "Email: xxx@xxx.com" or "Contact: xxx@xxx.com"
+    for match in re.findall(
+        r'(?:email|contact|correo)[\s:]*([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})',
+        html,
+        re.IGNORECASE,
+    ):
+        normalized = _normalize_email(match)
+        if normalized and normalized not in emails:
+            emails.append(normalized)
+
     return emails
 
 
@@ -167,11 +189,18 @@ async def _fetch_page(client: httpx.AsyncClient, url: str) -> str | None:
     """Fetch a page with one retry on failure. Returns HTML text or None."""
     for attempt in range(2):
         try:
-            resp = await client.get(url, headers=_HEADERS)
+            resp = await client.get(url, headers=_get_headers())
             if resp.status_code < 400:
                 return resp.text
-            return None
-        except Exception:
+            elif resp.status_code == 429:
+                # Rate limited, wait and retry
+                if attempt == 0:
+                    await asyncio.sleep(3)
+                    continue
+            else:
+                return None
+        except Exception as exc:
+            logger.debug("Error fetching %s: %s", url, exc)
             if attempt == 0:
                 await asyncio.sleep(2)
     return None

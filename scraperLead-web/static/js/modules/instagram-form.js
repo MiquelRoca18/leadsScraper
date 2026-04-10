@@ -281,8 +281,14 @@ export function initInstagramForm() {
       if (data.status === 'ok') {
         loginPass.value = '';
         await loadSession();
-      } else if (data.status === '2fa_required') {
-        showLoginAlert('Se requiere verificación 2FA. Complétala en la app y vuelve a intentarlo.', 'warn');
+        await loadPoolAccounts();
+      } else if (data.status === '2fa' || data.status === '2fa_required') {
+        showLoginAlert(data.message || 'Se requiere verificación en dos pasos (2FA).', 'warn');
+      } else if (data.status === 'challenge' || data.status === 'phone') {
+        showLoginAlert(data.message || 'Instagram requiere verificación manual.', 'warn');
+      } else if (data.status === 'ip_blocked' || data.status === 'account_issue' || data.status === 'network') {
+        // Errores que no se pueden solucionar con "Reconectar" — mostrar como error
+        showLoginAlert(data.message || 'No se pudo iniciar sesión. Revisa el mensaje arriba.', 'error');
       } else {
         showLoginAlert(data.message || 'Login fallido. Verifica las credenciales.', 'error');
       }
@@ -409,6 +415,10 @@ export function initInstagramForm() {
           else { stopPoll(followersPollInterval); followersPollInterval = null; }
           if (exportBtnEl) exportBtnEl.disabled = false;
           await loadResults(igView === 'todos' ? null : (displayedJobId || jobId));
+          // Refresh the jobs list so the completed job appears in Scrapeos section
+          if (igView === 'scrapeos') {
+            await renderJobsList();
+          }
           showAlert('Extracción completada.', 'ok');
           await loadUsage();
         } else if (job.status === 'waiting_rate_window') {
@@ -815,7 +825,8 @@ export function initInstagramForm() {
           setIgViewUi('scrapeos');
           await loadResults(displayedJobId);
           highlightSelectedJob(displayedJobId);
-          resultsWrapper?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          // Navigate to Leads section in the new 4-section nav
+          window.igGoToLeads?.();
         });
 
         jobsGrid.appendChild(card);
@@ -828,6 +839,13 @@ export function initInstagramForm() {
 
   btnTodos?.addEventListener('click', () => setIgView('todos').catch(() => {}));
   btnScrapeos?.addEventListener('click', () => setIgView('scrapeos').catch(() => {}));
+
+  // Called by the section nav (instagram.html inline script) when switching sections
+  window.igOnSectionChange = (sectionName) => {
+    if (sectionName === 'scrapeos' && !jobsLoaded) {
+      renderJobsList().catch(() => {});
+    }
+  };
 
   filterHasEmail?.addEventListener('change', () => { activeFilters.hasEmail = filterHasEmail.checked; applyFilters(); });
   filterBusiness?.addEventListener('change', () => { activeFilters.businessOnly = filterBusiness.checked; applyFilters(); });
@@ -903,9 +921,25 @@ export function initInstagramForm() {
   const poolTbody = document.getElementById('ig-pool-tbody');
   const poolEmpty = document.getElementById('ig-pool-empty');
 
+  // Banner de alerta para cuentas que necesitan login manual
+  const poolAlertBanner = document.getElementById('ig-pool-alert-banner');
+
   function renderPoolAccounts(accounts) {
     if (!poolTbody) return;
     poolTbody.innerHTML = '';
+
+    // Show/hide banner if any account needs manual login
+    const manualAccounts = (accounts || []).filter((a) => a.needs_manual_login);
+    if (poolAlertBanner) {
+      if (manualAccounts.length > 0) {
+        const names = manualAccounts.map((a) => `@${a.username}`).join(', ');
+        poolAlertBanner.textContent = `⚠ Login manual requerido en: ${names}. Abre la app de Instagram, completa la verificación y pulsa "Reconectar".`;
+        poolAlertBanner.classList.remove('hidden');
+      } else {
+        poolAlertBanner.classList.add('hidden');
+      }
+    }
+
     if (!accounts || accounts.length === 0) {
       poolTable?.classList.add('hidden');
       poolEmpty?.classList.remove('hidden');
@@ -918,15 +952,27 @@ export function initInstagramForm() {
       const tr = document.createElement('tr');
       tr.className = 'border-b border-slate-50 hover:bg-slate-50 transition';
 
-      const statusColor = acc.status === 'active' ? 'text-green-600' : acc.status === 'cooldown' ? 'text-amber-600' : 'text-slate-400';
-      const statusLabel = acc.status === 'active' ? 'Activa' : acc.status === 'cooldown' ? 'Cooldown' : 'Desactivada';
+      const needsManual = Boolean(acc.needs_manual_login);
+      const statusColor = needsManual
+        ? 'text-amber-600'
+        : acc.status === 'active' ? 'text-green-600'
+        : acc.status === 'cooldown' ? 'text-amber-600'
+        : 'text-slate-400';
+      const statusLabel = needsManual ? 'Login manual' : acc.status === 'active' ? 'Activa' : acc.status === 'cooldown' ? 'Cooldown' : 'Desactivada';
+      const primaryBadge = acc.is_primary
+        ? `<span class="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-600 font-semibold">Principal</span>`
+        : '';
+      const reloginBtn = needsManual
+        ? `<button class="ig-pool-relogin-btn text-xs text-amber-600 hover:text-amber-800 border border-amber-200 hover:border-amber-400 px-2 py-1 rounded-lg transition mr-2" data-username="${acc.username}" title="${acc.manual_login_reason || ''}">Reconectar</button>`
+        : '';
 
       tr.innerHTML = `
-        <td class="px-3 py-2 font-medium text-slate-800">@${acc.username}</td>
+        <td class="px-3 py-2 font-medium text-slate-800">@${acc.username}${primaryBadge}</td>
         <td class="px-3 py-2 text-xs font-semibold ${statusColor}">${statusLabel}</td>
         <td class="px-3 py-2 text-slate-500">${acc.requests_this_hour ?? 0}/35</td>
         <td class="px-3 py-2 text-slate-400 text-xs truncate max-w-[140px]">${acc.proxy_url || '—'}</td>
-        <td class="px-3 py-2 text-right">
+        <td class="px-3 py-2 text-right whitespace-nowrap">
+          ${reloginBtn}
           <button class="ig-pool-remove-btn text-xs text-red-500 hover:text-red-700 transition" data-username="${acc.username}">Eliminar</button>
         </td>
       `;
@@ -940,8 +986,40 @@ export function initInstagramForm() {
         try {
           await fetch(`/api/instagram/accounts/${encodeURIComponent(username)}`, { method: 'DELETE' });
           await loadPoolAccounts();
+          await loadSession();
         } catch (err) {
           console.error('Error removing account:', err);
+        }
+      });
+    });
+
+    poolTbody.querySelectorAll('.ig-pool-relogin-btn').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const username = btn.dataset.username;
+        btn.disabled = true;
+        btn.textContent = 'Reconectando…';
+        try {
+          const res = await fetch(`/api/instagram/accounts/relogin/${encodeURIComponent(username)}`, {
+            method: 'POST',
+          });
+          const data = await res.json();
+          if (data.status === 'ok') {
+            await loadPoolAccounts();
+            await loadSession();
+          } else if (data.status === 'challenge' || data.status === 'phone' || data.status === '2fa') {
+            btn.disabled = false;
+            btn.textContent = 'Reconectar';
+            if (poolAlertBanner) {
+              poolAlertBanner.textContent = `⚠ @${username} sigue requiriendo verificación manual: ${data.message}`;
+              poolAlertBanner.classList.remove('hidden');
+            }
+          } else {
+            btn.disabled = false;
+            btn.textContent = 'Reconectar';
+          }
+        } catch (_) {
+          btn.disabled = false;
+          btn.textContent = 'Reconectar';
         }
       });
     });
@@ -994,7 +1072,8 @@ export function initInstagramForm() {
       });
       const data = await res.json();
       if (!res.ok) {
-        if (poolAddStatus) poolAddStatus.textContent = data.detail || 'Error al iniciar sesión.';
+        const msg = data.message || data.detail || 'Error al añadir la cuenta.';
+        if (poolAddStatus) poolAddStatus.textContent = msg;
         return;
       }
       if (poolAddStatus) poolAddStatus.textContent = `✓ Cuenta @${username} añadida.`;
@@ -1002,6 +1081,7 @@ export function initInstagramForm() {
       if (poolPasswordInput) poolPasswordInput.value = '';
       if (poolProxyInput) poolProxyInput.value = '';
       await loadPoolAccounts();
+      await loadSession();
       setTimeout(() => {
         poolAddForm?.classList.add('hidden');
         poolToggleBtn.textContent = 'Añadir cuenta';
@@ -1017,4 +1097,11 @@ export function initInstagramForm() {
   // Load pool accounts on init and refresh every 30s
   loadPoolAccounts().catch(() => {});
   window.setInterval(loadPoolAccounts, 30000);
+
+  // Refresh jobs list periodically so new completed jobs appear in Scrapeos history
+  window.setInterval(() => {
+    if (jobsGrid && igView === 'scrapeos') {
+      renderJobsList().catch(() => {});
+    }
+  }, 15000);
 }

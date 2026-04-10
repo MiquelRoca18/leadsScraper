@@ -18,6 +18,7 @@ from backend.api.schemas import (
     SessionLoginRequest,
 )
 from backend.instagram import ig_health, ig_session
+from backend.instagram.ig_account_pool import account_pool
 from backend.instagram.ig_deduplicator import deduplicator
 from backend.instagram.ig_rate_limiter import RateLimitExceeded
 from backend.config.settings import settings as cfg
@@ -52,26 +53,30 @@ async def debug_last() -> Any:
 
 @router.post("/login")
 async def login(body: SessionLoginRequest) -> Any:
-    """Login with Instagram credentials. Password is never stored."""
-    success = await ig_session.login(body.username, body.password)
+    """Login with Instagram credentials and add as primary pool account."""
+    success, error_type, message = await account_pool.add_account(
+        body.username, body.password, is_primary=True
+    )
     if not success:
-        return {
-            "status": "error",
-            "message": ig_session.get_last_login_error() or "Login fallido. Verifica usuario y contraseña.",
-        }
+        # Map error_type to a status the frontend understands
+        status = error_type if error_type in ("challenge", "phone", "2fa") else "error"
+        return {"status": status, "message": message}
     return {"status": "ok", "message": "Sesión iniciada correctamente."}
 
 
 @router.get("/session")
 async def get_session() -> Any:
-    """Return current session status with username and age."""
-    return ig_session.get_session_info()
+    """Return session status based on pool primary account."""
+    info = account_pool.get_primary_info()
+    if info is None:
+        return {"logged_in": False, "username": None, "session_age_hours": None}
+    return info
 
 
 @router.delete("/session")
 async def delete_session() -> Any:
-    """Clear the active session and delete session file."""
-    await ig_session.logout()
+    """Remove the primary account from the pool."""
+    await account_pool.remove_primary()
     return {"status": "cleared"}
 
 
@@ -134,17 +139,22 @@ async def get_limits() -> Any:
 @router.get("/accounts", response_model=list[AccountResponse])
 async def list_accounts() -> Any:
     """List all pool accounts with their current status."""
-    from backend.instagram.ig_account_pool import account_pool
     return account_pool.get_pool_status()
 
 
 @router.post("/accounts", response_model=AccountResponse)
 async def add_account(body: AccountAddRequest) -> Any:
     """Add a new Instagram account to the pool."""
-    from backend.instagram.ig_account_pool import account_pool
-    success = await account_pool.add_account(body.username, body.password, proxy_url=body.proxy_url)
+    from fastapi.responses import JSONResponse
+
+    success, error_type, message = await account_pool.add_account(
+        body.username, body.password, proxy_url=body.proxy_url
+    )
     if not success:
-        raise HTTPException(status_code=400, detail="Failed to login with provided credentials.")
+        return JSONResponse(
+            status_code=400,
+            content={"error_type": error_type, "message": message},
+        )
     status_list = account_pool.get_pool_status()
     for entry in status_list:
         if entry["username"] == body.username:
@@ -152,10 +162,19 @@ async def add_account(body: AccountAddRequest) -> Any:
     raise HTTPException(status_code=500, detail="Account added but not found in pool.")
 
 
+@router.post("/accounts/relogin/{username}")
+async def relogin_account(username: str) -> Any:
+    """Re-authenticate a pool account using saved credentials."""
+    success, error_type, message = await account_pool.attempt_relogin(username)
+    if success:
+        return {"status": "ok", "message": "Sesión reconectada correctamente."}
+    status = error_type if error_type in ("challenge", "phone", "2fa") else "error"
+    return {"status": status, "message": message}
+
+
 @router.delete("/accounts/{username}")
 async def remove_account(username: str) -> Any:
     """Remove an account from the pool."""
-    from backend.instagram.ig_account_pool import account_pool
     removed = await account_pool.remove_account(username)
     if not removed:
         raise HTTPException(status_code=404, detail=f"Account '{username}' not found in pool.")
@@ -179,7 +198,7 @@ async def get_profile(username: str) -> Any:
 @router.post("/search")
 async def start_search(body: SearchRequest, background_tasks: BackgroundTasks) -> Any:
     limits = await get_limits()
-    if body.mode == "followers" and not ig_session.is_logged_in():
+    if body.mode == "followers" and account_pool.is_empty():
         raise HTTPException(status_code=400, detail="Necesitas sesión activa para Modo B.")
     if body.mode == "dorking" and not limits["can_start_dorking"]:
         raise HTTPException(
@@ -331,7 +350,6 @@ async def _run_dorking_job(job_id: str, request: SearchRequest) -> None:
 
 async def _run_followers_job(job_id: str, request: SearchRequest) -> None:
     from backend.instagram.ig_followers import extract_followers_leads
-    from backend.instagram.ig_account_pool import account_pool
 
     scan_limit = max(request.email_goal, min(cfg.max_auth_daily, request.email_goal * 4))
     max_resumes = max(0, cfg.followers_max_resumes_per_day)

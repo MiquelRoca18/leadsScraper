@@ -465,6 +465,11 @@ async def ig_accounts_remove(username: str, request: Request):
     return await _proxy_to(f"{INSTALEADS_URL}/api/instagram/accounts/{username}", request)
 
 
+@app.post("/api/instagram/accounts/relogin/{username}")
+async def ig_accounts_relogin(username: str, request: Request):
+    return await _proxy_to(f"{INSTALEADS_URL}/api/instagram/accounts/relogin/{username}", request)
+
+
 
 @app.get("/api/instagram/avatar")
 async def ig_avatar(url: str):

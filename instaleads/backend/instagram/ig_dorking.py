@@ -48,6 +48,15 @@ _HEADERS = {
     "Accept-Language": "es-ES,es;q=0.9",
 }
 
+_USER_AGENTS = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:132.0) Gecko/20100101 Firefox/132.0",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15",
+    "Mozilla/5.0 (X11; Linux x86_64; rv:132.0) Gecko/20100101 Firefox/132.0",
+]
+
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -187,7 +196,150 @@ async def _discover_via_google(
     return all_usernames
 
 
-# ── Strategy 2: Hashtag-based fallback ──────────────────────────────────────
+# ── Strategy 2: DuckDuckGo web search (no API key needed) ───────────────────
+
+def _build_search_queries(niche: str, location: str) -> list[str]:
+    """Build search queries for web scraping engines."""
+    n_ascii = _to_ascii(niche)
+    queries = [
+        f'site:instagram.com "{niche}" "{location}" email',
+        f'site:instagram.com "{niche}" "{location}"',
+        f'site:instagram.com {n_ascii} {location}',
+    ]
+    if not location:
+        queries = [
+            f'site:instagram.com "{niche}" email',
+            f'site:instagram.com "{niche}"',
+        ]
+    return queries
+
+
+async def _discover_via_duckduckgo(
+    niche: str, location: str, max_results: int
+) -> list[str]:
+    """
+    Scrape DuckDuckGo HTML for Instagram profiles matching niche+location.
+    No API key required. Uses curl_cffi browser impersonation with User-Agent rotation,
+    retry logic, and optional Bing fallback.
+    """
+    queries = _build_search_queries(niche, location)
+    all_usernames: list[str] = []
+    seen: set[str] = set()
+
+    logger.info("Discovering usernames via DuckDuckGo for '%s %s'", niche, location)
+
+    async with AsyncSession(impersonate="chrome131") as session:
+        for query in queries:
+            if len(all_usernames) >= max_results:
+                break
+
+            # Retry logic with backoff
+            for attempt in range(1, 4):  # 3 attempts
+                if len(all_usernames) >= max_results:
+                    break
+                try:
+                    user_agent = random.choice(_USER_AGENTS)
+                    resp = await session.get(
+                        "https://html.duckduckgo.com/html/",
+                        params={"q": query},
+                        headers={
+                            "User-Agent": user_agent,
+                            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                            "Accept-Language": "es-ES,es;q=0.9",
+                            "Accept-Encoding": "gzip, deflate",
+                        },
+                        timeout=20,
+                    )
+                    if resp.status_code == 200:
+                        matches = _USERNAME_RE.findall(resp.text)
+                        clean = _clean_usernames(matches)
+                        for u in clean:
+                            if u not in seen:
+                                seen.add(u)
+                                all_usernames.append(u)
+                        logger.debug(
+                            "DDG query '%s...' returned %d usernames (total: %d)",
+                            query[:50], len(clean), len(all_usernames),
+                        )
+                        break  # Success, move to next query
+                    elif resp.status_code in (429, 202):  # Rate limited or blocked
+                        wait_time = (2 ** attempt) * random.uniform(1, 3)  # Exponential backoff
+                        logger.warning(
+                            "DDG returned %d for query (attempt %d/3) — waiting %.1fs",
+                            resp.status_code, attempt, wait_time
+                        )
+                        await asyncio.sleep(wait_time)
+                    else:
+                        logger.warning("DuckDuckGo returned %d for query: %s", resp.status_code, query[:60])
+                        break
+                except Exception as exc:
+                    logger.warning("DuckDuckGo search failed (attempt %d/3) for '%s': %s", attempt, query[:60], exc)
+                    if attempt < 3:
+                        await asyncio.sleep(2 ** attempt)
+
+            # Delay between queries to avoid rate limiting
+            await asyncio.sleep(random.uniform(4.0, 8.0))
+
+    if all_usernames:
+        logger.info("✅ DuckDuckGo found %d usernames for '%s %s'", len(all_usernames), niche, location)
+    else:
+        logger.warning("⚠️ DuckDuckGo found 0 usernames — will try Bing fallback")
+        all_usernames = await _discover_via_bing(niche, location, max_results)
+
+    return all_usernames[:max_results]
+
+
+# ── Strategy 2b: Bing fallback (if DuckDuckGo fails) ───────────────────────
+
+async def _discover_via_bing(
+    niche: str, location: str, max_results: int
+) -> list[str]:
+    """
+    Fallback: Scrape Bing HTML for Instagram profiles.
+    Used if DuckDuckGo is rate-limited or blocked.
+    """
+    queries = _build_search_queries(niche, location)
+    all_usernames: list[str] = []
+    seen: set[str] = set()
+
+    logger.info("Falling back to Bing for '%s %s'", niche, location)
+
+    async with AsyncSession(impersonate="chrome131") as session:
+        for query in queries:
+            if len(all_usernames) >= max_results:
+                break
+            try:
+                user_agent = random.choice(_USER_AGENTS)
+                resp = await session.get(
+                    "https://www.bing.com/search",
+                    params={"q": query},
+                    headers={
+                        "User-Agent": user_agent,
+                        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                        "Accept-Language": "es-ES,es;q=0.9",
+                        "Accept-Encoding": "gzip, deflate",
+                    },
+                    timeout=20,
+                )
+                if resp.status_code == 200:
+                    matches = _USERNAME_RE.findall(resp.text)
+                    clean = _clean_usernames(matches)
+                    for u in clean:
+                        if u not in seen:
+                            seen.add(u)
+                            all_usernames.append(u)
+                    logger.debug("Bing query returned %d usernames", len(clean))
+                else:
+                    logger.warning("Bing returned %d for query", resp.status_code)
+                await asyncio.sleep(random.uniform(3.0, 6.0))
+            except Exception as exc:
+                logger.warning("Bing search failed for '%s': %s", query[:60], exc)
+
+    logger.info("Bing found %d usernames for '%s %s'", len(all_usernames), niche, location)
+    return all_usernames[:max_results]
+
+
+# ── Strategy 3: Hashtag-based fallback ──────────────────────────────────────
 
 async def _fetch_profile_exists(session: AsyncSession, username: str) -> bool:
     """Check if an Instagram username actually exists (web_profile_info)."""
@@ -358,11 +510,12 @@ async def _discover_via_location_api(niche: str, location: str, max_results: int
 async def find_usernames(target: str, max_results: int = 50) -> list[str]:
     """
     Find Instagram usernames related to the target.
-    Uses a 4-strategy cascade:
-      1. Google CSE (best quality, no auth needed)
-      2. Hashtag API via instagrapi (if session available)
-      3. Location API via instagrapi (if session available)
-      4. Hashtag pattern fallback (worst quality, no auth needed)
+    Uses a 5-strategy cascade:
+      1. Google CSE (best quality, no auth needed, requires API key)
+      2. DuckDuckGo web scraping with Bing fallback (if DDG rate-limited)
+      3. Hashtag API via instagrapi (if session available)
+      4. Location API via instagrapi (if session available)
+      5. Hashtag pattern fallback (worst quality, no auth needed)
 
     Args:
         target: "niche|location" string (e.g. "fotografo|valencia")
@@ -385,42 +538,66 @@ async def find_usernames(target: str, max_results: int = 50) -> list[str]:
     logger.info("🔍 DORKING DISCOVERY PIPELINE: niche='%s' | location='%s' | max=%d", niche, location, max_results)
     logger.info("=" * 70)
 
-    # Strategy 1: Google CSE (best quality, unauthenticated)
-    logger.info("[1/4] Attempting Google CSE discovery...")
+    # Strategy 1: Google CSE (best quality, requires API key)
+    logger.info("[1/5] Attempting Google CSE discovery...")
     usernames = await _discover_via_google(niche, location, max_results)
     seen = set(usernames)
 
-    # Strategy 2: Hashtag API if Google returned < 50%
+    # Strategy 2: DuckDuckGo web scraping (no API key needed, always available)
     if len(usernames) < max_results * 0.5:
-        logger.info("[2/4] Google CSE insufficient (%d/%d) — trying Hashtag API...", len(usernames), max_results)
+        logger.info("[2/5] Google CSE insufficient (%d/%d) — trying DuckDuckGo...", len(usernames), max_results)
+        ddg_results = await _discover_via_duckduckgo(niche, location, max_results - len(usernames))
+        added = 0
+        for u in ddg_results:
+            if u not in seen:
+                seen.add(u)
+                usernames.append(u)
+                added += 1
+        logger.info("     DuckDuckGo added %d new usernames (total: %d)", added, len(usernames))
+    else:
+        logger.info("[2/5] Skipping DuckDuckGo (Google CSE sufficient)")
+
+    # Strategy 3: Hashtag API if session available
+    if len(usernames) < max_results * 0.5:
+        logger.info("[3/5] Under 50%% quota — trying Hashtag API...")
         hashtag_results = await _discover_via_hashtag_api(niche, location, max_results - len(usernames))
+        added = 0
         for u in hashtag_results:
             if u not in seen:
                 seen.add(u)
                 usernames.append(u)
-        logger.info("     Hashtag API added %d new usernames (total: %d)", len(hashtag_results), len(usernames))
+                added += 1
+        logger.info("     Hashtag API added %d new usernames (total: %d)", added, len(usernames))
     else:
-        logger.info("[2/4] Skipping Hashtag API (Google CSE sufficient)")
+        logger.info("[3/5] Skipping Hashtag API (quota sufficient)")
 
-    # Strategy 3: Location API if still under max_results
+    # Strategy 4: Location API if session available and location given
     if location and len(usernames) < max_results:
-        logger.info("[3/4] Under quota — trying Location API for '%s'...", location)
+        logger.info("[4/5] Trying Location API for '%s'...", location)
         location_results = await _discover_via_location_api(niche, location, max_results - len(usernames))
+        added = 0
         for u in location_results:
             if u not in seen:
                 seen.add(u)
                 usernames.append(u)
-        logger.info("     Location API added %d new usernames (total: %d)", len(location_results), len(usernames))
+                added += 1
+        logger.info("     Location API added %d new usernames (total: %d)", added, len(usernames))
     else:
-        logger.info("[3/4] Skipping Location API (%s)", "quota met" if not location else "location not specified")
+        logger.info("[4/5] Skipping Location API (%s)", "no location" if not location else "quota met")
 
-    # Strategy 4: Hashtag pattern fallback if still nothing
-    if not usernames:
-        logger.info("[4/4] All strategies returned 0 — using Hashtag Pattern Fallback (worst quality)...")
-        usernames = await _discover_via_hashtags(niche, location, max_results)
-        logger.info("     Hashtag Fallback found %d usernames", len(usernames))
+    # Strategy 5: Hashtag pattern fallback if still very few results
+    if len(usernames) < 5:
+        logger.info("[5/5] Very few results (%d) — using Hashtag Pattern Fallback...", len(usernames))
+        fallback_results = await _discover_via_hashtags(niche, location, max_results - len(usernames))
+        added = 0
+        for u in fallback_results:
+            if u not in seen:
+                seen.add(u)
+                usernames.append(u)
+                added += 1
+        logger.info("     Hashtag Fallback added %d usernames (total: %d)", added, len(usernames))
     else:
-        logger.info("[4/4] Skipping Hashtag Fallback (already have %d usernames)", len(usernames))
+        logger.info("[5/5] Skipping Hashtag Fallback (have %d usernames)", len(usernames))
 
     logger.info("=" * 70)
     logger.info("✅ DISCOVERY COMPLETE: Found %d usernames for target '%s'", len(usernames), target)
