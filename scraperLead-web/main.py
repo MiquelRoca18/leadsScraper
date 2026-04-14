@@ -14,6 +14,7 @@ load_dotenv()
 
 MAPLEADS_URL = os.getenv("MAPLEADS_API_URL", "http://localhost:8001").rstrip("/")
 INSTALEADS_URL = os.getenv("INSTALEADS_API_URL", "http://localhost:8002").rstrip("/")
+LINKEDINLEADS_URL = os.getenv("LINKEDINLEADS_API_URL", "http://localhost:8003").rstrip("/")
 
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -223,9 +224,10 @@ async def databases(request: Request):
     ml_stats_task = safe_fetch(f"{MAPLEADS_URL}/api/stats", timeout=10.0)
     proxy_task = safe_fetch(f"{MAPLEADS_URL}/api/proxy/status", timeout=5.0)
     ig_stats_task = safe_fetch(f"{INSTALEADS_URL}/api/instagram/stats", timeout=5.0)
+    li_stats_task = safe_fetch(f"{LINKEDINLEADS_URL}/api/linkedin/stats", timeout=5.0)
 
-    (stats, _), (proxy_status, _), (ig_data, _) = await asyncio.gather(
-        ml_stats_task, proxy_task, ig_stats_task
+    (stats, _), (proxy_status, _), (ig_data, _), (li_data, _) = await asyncio.gather(
+        ml_stats_task, proxy_task, ig_stats_task, li_stats_task
     )
 
     stats = stats or {}
@@ -234,11 +236,16 @@ async def databases(request: Request):
     if ig_data and isinstance(ig_data, dict):
         instagram_stats = ig_data.get("total_leads", 0) or 0
 
+    linkedin_stats = {}
+    if li_data and isinstance(li_data, dict):
+        linkedin_stats = li_data
+
     return templates.TemplateResponse("databases.html", {
         "request": request,
         "stats": stats,
         "proxy_status": proxy_status,
         "instagram_stats": instagram_stats,
+        "linkedin_stats": linkedin_stats,
     })
 
 
@@ -469,6 +476,83 @@ async def ig_accounts_remove(username: str, request: Request):
 async def ig_accounts_relogin(username: str, request: Request):
     return await _proxy_to(f"{INSTALEADS_URL}/api/instagram/accounts/relogin/{username}", request)
 
+
+
+@app.get("/linkedin")
+async def linkedin_page(request: Request):
+    health, health_state = await safe_fetch(f"{LINKEDINLEADS_URL}/api/linkedin/health", timeout=5.0)
+    health = health or {"status": "unknown", "db_exists": False, "accounts_count": 0}
+    state = "ok"
+    message = None
+    if health_state == "timeout":
+        state = "timeout"
+        message = "El backend de LinkedIn no responde. Asegúrate de que LinkedInLeads está corriendo en el puerto 8003."
+    elif health_state == "upstream_error":
+        state = "upstream_error"
+        message = "No se pudo cargar el estado de LinkedIn."
+    return templates.TemplateResponse("linkedin.html", {
+        "request": request,
+        "health": health,
+        "state": state,
+        "message": message,
+    })
+
+
+# ── Proxy routes: LinkedIn → localhost:8003 ───────────────────────────────────
+
+@app.get("/api/linkedin/health")
+async def li_health(request: Request):
+    return await _proxy_to(f"{LINKEDINLEADS_URL}/api/linkedin/health", request)
+
+
+@app.get("/api/linkedin/stats")
+async def li_stats(request: Request):
+    return await _proxy_to(f"{LINKEDINLEADS_URL}/api/linkedin/stats", request)
+
+
+@app.post("/api/linkedin/search")
+async def li_search(request: Request):
+    return await _proxy_to(f"{LINKEDINLEADS_URL}/api/linkedin/search", request)
+
+
+@app.get("/api/linkedin/status")
+async def li_status(request: Request):
+    return await _proxy_to(f"{LINKEDINLEADS_URL}/api/linkedin/status", request)
+
+
+@app.get("/api/linkedin/jobs")
+async def li_jobs(request: Request):
+    return await _proxy_to(f"{LINKEDINLEADS_URL}/api/linkedin/jobs", request)
+
+
+@app.get("/api/linkedin/leads")
+async def li_leads(request: Request):
+    return await _proxy_to(f"{LINKEDINLEADS_URL}/api/linkedin/leads", request)
+
+
+@app.get("/api/linkedin/leads/export")
+async def li_leads_export(request: Request):
+    return await _proxy_to(f"{LINKEDINLEADS_URL}/api/linkedin/leads/export", request)
+
+
+@app.get("/api/linkedin/accounts")
+async def li_accounts_list(request: Request):
+    return await _proxy_to(f"{LINKEDINLEADS_URL}/api/linkedin/accounts", request)
+
+
+@app.post("/api/linkedin/accounts")
+async def li_accounts_add(request: Request):
+    return await _proxy_to(f"{LINKEDINLEADS_URL}/api/linkedin/accounts", request)
+
+
+@app.delete("/api/linkedin/accounts/{username}")
+async def li_accounts_delete(username: str, request: Request):
+    return await _proxy_to(f"{LINKEDINLEADS_URL}/api/linkedin/accounts/{username}", request)
+
+
+@app.get("/api/linkedin/accounts/{username}/stats")
+async def li_account_stats(username: str, request: Request):
+    return await _proxy_to(f"{LINKEDINLEADS_URL}/api/linkedin/accounts/{username}/stats", request)
 
 
 @app.get("/api/instagram/avatar")

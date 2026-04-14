@@ -45,6 +45,36 @@
         Obtener Leads
       </a>
 
+      {% set is_gmaps = request.url.path.startswith("/search") or request.url.path.startswith("/leads") %}
+      <a href="/search"
+         class="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm font-medium transition no-underline
+                {% if is_gmaps %}bg-white/10 text-white{% else %}text-slate-400 hover:bg-white/5 hover:text-white{% endif %}">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2C8.134 2 5 5.134 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.866-3.134-7-7-7z"/><circle cx="12" cy="9" r="2.5"/>
+        </svg>
+        Google Maps
+      </a>
+
+      {% set is_instagram = request.url.path.startswith("/instagram") %}
+      <a href="/instagram"
+         class="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm font-medium transition no-underline
+                {% if is_instagram %}bg-white/10 text-white{% else %}text-slate-400 hover:bg-white/5 hover:text-white{% endif %}">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/>
+        </svg>
+        Instagram
+      </a>
+
+      {% set is_linkedin = request.url.path.startswith("/linkedin") %}
+      <a href="/linkedin"
+         class="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm font-medium transition no-underline
+                {% if is_linkedin %}bg-white/10 text-white{% else %}text-slate-400 hover:bg-white/5 hover:text-white{% endif %}">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/>
+        </svg>
+        LinkedIn
+      </a>
+
       <p class="text-[10px] font-semibold tracking-[0.08em] text-white/30 uppercase px-2 pt-4 pb-1 select-none">Datos</p>
 
       {% set is_databases = request.url.path == "/databases" %}

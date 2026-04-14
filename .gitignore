@@ -39,3 +39,5 @@ Thumbs.db
 
 *.md
 !README.md
+
+/linkedinleads/sessions
