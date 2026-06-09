@@ -1,0 +1,13 @@
+.env
+# Solo la carpeta data en la raíz de mapleads (no backend/data/ con el catálogo JSON)
+/data/
+__pycache__/
+.pytest_cache/
+*.pyc
+*.pyo
+.venv/
+venv/
+dist/
+build/
+*.egg-info/
+.DS_Store

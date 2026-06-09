@@ -1,0 +1,448 @@
+{% extends "base.html" %}
+
+{% block title %}Instagram — Scraper Lead{% endblock %}
+
+{% block head %}
+<style>
+  @keyframes pulse-ig { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+  .dot-pulse { animation: pulse-ig 2s infinite; }
+  /* maintenance banner duplicates #ig-alert which is already shown in context */
+  #ig-maintenance-banner { display: none !important; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="instagram-form-page"
+     data-health='{{ health | tojson }}'
+     data-recent-jobs='{{ recent_jobs | tojson }}'>
+
+  {% if state in ('timeout', 'upstream_error') %}
+  <div class="bg-amber-50 border border-amber-200 text-amber-800 rounded-xl px-4 py-3 mb-5 text-sm">
+    <p class="font-medium">No se pudo consultar InstaLeads.</p>
+    <p class="mt-0.5 text-amber-700 text-xs">Comprueba que el backend corre en el puerto 8002.</p>
+  </div>
+  {% endif %}
+
+  <!-- Banners (always in DOM, JS controls visibility) -->
+  <div id="ig-maintenance-banner" class="hidden bg-amber-50 border border-amber-200 text-amber-800 rounded-xl px-4 py-3 mb-5 text-sm font-medium"></div>
+
+  <!-- ── Header ──────────────────────────────────────────────────────── -->
+  <div class="flex items-center justify-between gap-4 mb-5 flex-wrap">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+           style="background:linear-gradient(135deg,rgba(225,48,108,.15),rgba(131,58,180,.15))">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <defs>
+            <linearGradient id="ig-g" x1="0%" y1="100%" x2="100%" y2="0%">
+              <stop offset="0%" stop-color="#FCAF45"/>
+              <stop offset="40%" stop-color="#E1306C"/>
+              <stop offset="100%" stop-color="#833AB4"/>
+            </linearGradient>
+          </defs>
+          <rect x="2" y="2" width="20" height="20" rx="5" ry="5" stroke="url(#ig-g)"/>
+          <circle cx="12" cy="12" r="4" stroke="url(#ig-g)"/>
+          <circle cx="17.5" cy="6.5" r="1" fill="#E1306C" stroke="none"/>
+        </svg>
+      </div>
+      <div>
+        <h1 class="text-xl font-bold text-slate-800 leading-tight">Instagram Leads</h1>
+        <p class="text-slate-400 text-xs">Extracción de emails desde Instagram</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-2 flex-wrap justify-end">
+      <div class="flex items-center gap-1.5 bg-white border border-slate-200 rounded-full px-3 py-1.5">
+        <span id="ig-health-dot" class="w-2.5 h-2.5 rounded-full bg-slate-300 shrink-0"></span>
+        <span id="ig-health-text" class="text-xs font-medium text-slate-600">Comprobando…</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Status row ──────────────────────────────────────────────────── -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
+    <div class="bg-white rounded-xl border border-slate-100 shadow-sm px-4 py-3">
+      <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Conector</p>
+      <p id="ig-health-details" class="text-xs text-slate-600 leading-snug">—</p>
+    </div>
+    <div class="bg-white rounded-xl border border-slate-100 shadow-sm px-4 py-3">
+      <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Uso diario</p>
+      <div class="space-y-1.5">
+        <div class="flex items-center justify-between gap-2">
+          <span class="text-[11px] text-slate-400">Dorking</span>
+          <span id="ig-usage-unauth" class="text-xs font-semibold text-slate-700 tabular-nums">—</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Main nav ────────────────────────────────────────────────────── -->
+  <div class="flex gap-1 mb-5 bg-slate-100 rounded-xl p-1 w-fit">
+    <button class="ig-main-tab flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium transition bg-white text-slate-700 shadow-sm"
+            data-view="scraper">
+      Scraper
+    </button>
+    <button class="ig-main-tab flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium transition text-slate-500 hover:text-slate-700"
+            data-view="leads">
+      Leads
+    </button>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════
+       VIEW: SCRAPER
+  ══════════════════════════════════════════════════════════════════ -->
+  <div id="ig-view-scraper">
+
+    <div class="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-sm font-semibold text-slate-700">Iniciar nuevo scrapeo</h2>
+        <button id="ig-help-btn" type="button" title="Cómo funciona y buenas prácticas"
+                class="w-6 h-6 rounded-full border border-slate-300 text-slate-400 hover:text-slate-600 hover:border-slate-400 text-xs font-bold flex items-center justify-center transition">?</button>
+      </div>
+
+      <!-- Mode tabs -->
+      <div class="flex gap-1 mb-5 bg-slate-100 rounded-xl p-1 w-fit">
+        <button id="ig-tab-dorking"
+                class="px-4 py-2 rounded-lg text-sm font-medium transition bg-white text-slate-800 shadow-sm">
+          Modo A — Dorking
+        </button>
+      </div>
+
+      <!-- Panel A: Dorking -->
+      <div id="ig-panel-dorking">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+          <div>
+            <label class="block text-xs font-medium text-slate-500 mb-1.5">Nicho / Sector</label>
+            <input id="ig-niche" type="text" placeholder="ej: fotógrafo, restaurante, coach…"
+                   class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#E1306C]/30">
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-500 mb-1.5">Ubicación</label>
+            <input id="ig-location" type="text" placeholder="ej: Barcelona, Madrid, Valencia…"
+                   class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#E1306C]/30">
+          </div>
+        </div>
+        <div class="mb-5">
+          <label class="block text-xs font-medium text-slate-500 mb-1.5">Objetivo de emails</label>
+          <input id="ig-dorking-email-goal" type="number" value="20" min="1"
+                 class="w-32 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#E1306C]/30">
+          <div id="ig-capacity-warning" class="hidden mt-2 flex items-start gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            <svg class="shrink-0 mt-0.5" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <span id="ig-capacity-warning-text"></span>
+          </div>
+        </div>
+        <div class="flex items-center gap-3 flex-wrap">
+          <button id="ig-dorking-start-btn"
+                  class="flex items-center gap-2 px-5 py-2.5 rounded-xl text-white text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  style="background:linear-gradient(90deg,#E1306C,#833AB4)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            Buscar con Dorking
+          </button>
+          <button id="ig-dorking-cancel-btn" type="button"
+                  class="hidden flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 text-sm font-medium hover:bg-slate-50 transition disabled:opacity-50 disabled:cursor-not-allowed">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+            Cancelar scrapeo
+          </button>
+          <button id="ig-dorking-export-btn" disabled
+                  class="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm font-medium hover:bg-slate-50 transition disabled:opacity-40 disabled:cursor-not-allowed">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Exportar CSV
+          </button>
+        </div>
+        <div id="ig-dorking-progress" class="hidden mt-5 p-4 bg-slate-50 rounded-xl border border-slate-100">
+          <div class="flex items-center justify-between mb-2">
+            <p id="ig-dorking-progress-text" class="text-xs font-semibold text-slate-600">Buscando…</p>
+            <p id="ig-dorking-emails-text" class="text-xs text-slate-400">0 emails</p>
+          </div>
+          <div class="w-full bg-slate-200 rounded-full h-2">
+            <div id="ig-dorking-bar" class="h-2 rounded-full transition-all duration-500"
+                 style="width:0%;background:linear-gradient(90deg,#E1306C,#833AB4)"></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Job status alerts — shown in context after progress bars -->
+    <div id="ig-limit-alert" class="hidden mt-4 rounded-xl border px-4 py-3 text-sm"></div>
+    <div id="ig-alert" class="hidden rounded-xl border px-4 py-3 text-sm mt-3"></div>
+
+  </div><!-- /ig-view-scraper -->
+
+
+  <!-- ══════════════════════════════════════════════════════════════════
+       VIEW: LEADS
+  ══════════════════════════════════════════════════════════════════ -->
+  <div id="ig-view-leads" class="hidden">
+
+    <!-- Sub-nav (managed by instagram-form.js via ig-btn-todos / ig-btn-scrapeos) -->
+    <div class="flex gap-1 mb-4 bg-slate-100 rounded-xl p-1 w-fit">
+      <button id="ig-btn-todos"
+              class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition bg-white text-slate-700 shadow-sm">
+        Todos los leads
+      </button>
+      <button id="ig-btn-scrapeos"
+              class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition text-slate-500 hover:text-slate-700">
+        Por scrapeo
+      </button>
+    </div>
+
+    <!-- Jobs grid (visible only in "Por scrapeo" mode, no job selected) -->
+    <div id="ig-jobs-view" class="hidden mb-4">
+      <div class="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+        <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+          <p class="text-sm font-semibold text-slate-700">
+            Historial de scrapeos
+            <span id="ig-jobs-count" class="text-xs font-normal text-slate-400 ml-1"></span>
+          </p>
+        </div>
+        <div class="p-4">
+          <div id="ig-jobs-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"></div>
+          <p id="ig-jobs-empty" class="hidden text-center text-slate-400 py-8 text-sm">No hay scrapeos registrados aún.</p>
+          <p id="ig-jobs-error" class="hidden text-center text-red-400 py-8 text-sm">Error al cargar el historial.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Placeholder: no job selected yet -->
+    <div id="ig-scrapeos-placeholder" class="hidden bg-white rounded-2xl border border-slate-100 shadow-sm p-10 text-center text-slate-400 text-sm mb-4">
+      Selecciona un scrapeo de la lista para ver sus leads.
+    </div>
+
+    <!-- Job detail header: shown when a specific scrapeo is selected -->
+    <div id="ig-job-detail-header" class="hidden mb-3 bg-white rounded-2xl border border-slate-100 shadow-sm px-5 py-4 flex items-center gap-4">
+      <button id="ig-back-btn"
+              class="flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-800 border border-slate-200 rounded-lg px-3 py-1.5 hover:bg-slate-50 transition shrink-0">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+        Volver
+      </button>
+      <div class="flex-1 min-w-0">
+        <p id="ig-job-detail-title" class="text-sm font-semibold text-slate-800 truncate">—</p>
+        <p id="ig-job-detail-meta" class="text-xs text-slate-400 mt-0.5">—</p>
+      </div>
+    </div>
+
+    <!-- Leads table -->
+    <div id="ig-results-wrapper" class="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+      <div class="px-5 py-4 border-b border-slate-100 flex flex-wrap gap-3 items-center">
+        <p class="text-sm font-semibold text-slate-700 mr-auto">
+          Leads
+          <span id="ig-results-count" class="text-slate-400 font-normal ml-1"></span>
+        </p>
+        <label class="flex items-center gap-1.5 text-xs text-slate-500 cursor-pointer select-none">
+          <input id="ig-filter-has-email" type="checkbox" class="rounded">
+          Solo con email
+        </label>
+        <label class="flex items-center gap-1.5 text-xs text-slate-500 cursor-pointer select-none">
+          <input id="ig-filter-business" type="checkbox" class="rounded">
+          Solo Business
+        </label>
+        <a id="ig-leads-export-btn" href="/api/instagram/export"
+           class="hidden flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 text-white text-xs font-medium rounded-lg hover:bg-slate-700 transition">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Exportar CSV
+        </a>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-slate-50 border-b border-slate-100">
+            <tr>
+              <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500">Usuario</th>
+              <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500">Nombre</th>
+              <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500">Email</th>
+              <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500">Seguidores</th>
+              <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500">Tipo</th>
+              <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500">Fuente</th>
+              <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500">Web</th>
+            </tr>
+          </thead>
+          <tbody id="ig-results-tbody">
+            <tr>
+              <td colspan="7" class="text-center text-slate-400 py-10 text-sm">
+                Ve a la vista <strong>Scraper</strong>, inicia una búsqueda y luego vuelve aquí para ver los resultados.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div id="ig-empty-state" class="hidden text-center py-10 text-slate-400 text-sm">
+        No hay leads con los filtros actuales.
+      </div>
+    </div>
+
+  </div><!-- /ig-view-leads -->
+
+
+</div><!-- /#instagram-form-page -->
+{% endblock %}
+
+{% block scripts %}
+
+<!-- ── Help modal ─────────────────────────────────────────────────────── -->
+<div id="ig-help-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+  <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" id="ig-help-backdrop"></div>
+  <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6">
+
+    <div class="flex items-start justify-between mb-5">
+      <div>
+        <h3 class="text-base font-semibold text-slate-800">Cómo usar el Modo A — Dorking</h3>
+        <p class="text-xs text-slate-400 mt-0.5">Guía de uso y buenas prácticas</p>
+      </div>
+      <button id="ig-help-close" class="text-slate-400 hover:text-slate-600 transition ml-4 mt-0.5">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+
+    <!-- Cómo funciona -->
+    <div class="mb-5">
+      <h4 class="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-2">¿Cómo funciona?</h4>
+      <ol class="space-y-2 text-sm text-slate-600">
+        <li class="flex gap-2"><span class="shrink-0 w-5 h-5 rounded-full bg-pink-100 text-pink-700 text-xs font-bold flex items-center justify-center">1</span>Genera ~40 búsquedas en Google (vía Startpage) con variaciones del nicho + ciudad + señales de email.</li>
+        <li class="flex gap-2"><span class="shrink-0 w-5 h-5 rounded-full bg-pink-100 text-pink-700 text-xs font-bold flex items-center justify-center">2</span>Extrae los @usernames de Instagram que aparecen en los resultados.</li>
+        <li class="flex gap-2"><span class="shrink-0 w-5 h-5 rounded-full bg-pink-100 text-pink-700 text-xs font-bold flex items-center justify-center">3</span>Consulta cada perfil en la API pública de Instagram (sin login).</li>
+        <li class="flex gap-2"><span class="shrink-0 w-5 h-5 rounded-full bg-pink-100 text-pink-700 text-xs font-bold flex items-center justify-center">4</span>Busca el email en: campo de negocio → bio → web vinculada.</li>
+      </ol>
+    </div>
+
+    <hr class="border-slate-100 mb-5">
+
+    <!-- Por qué no llega al objetivo -->
+    <div class="mb-5">
+      <h4 class="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-3">¿Por qué a veces no llega al objetivo?</h4>
+      <div class="space-y-3">
+        <div class="flex gap-3 bg-amber-50 border border-amber-100 rounded-xl p-3">
+          <span class="text-lg shrink-0">🔄</span>
+          <div>
+            <p class="text-xs font-semibold text-amber-900 mb-0.5">Pool de candidatos agotado</p>
+            <p class="text-xs text-amber-800">Si ya buscaste ese nicho hoy, los perfiles ya están procesados. Los perfiles "sin email" se liberan a los <strong>3 días</strong>.</p>
+          </div>
+        </div>
+        <div class="flex gap-3 bg-blue-50 border border-blue-100 rounded-xl p-3">
+          <span class="text-lg shrink-0">📉</span>
+          <div>
+            <p class="text-xs font-semibold text-blue-900 mb-0.5">Baja tasa de email en el nicho</p>
+            <p class="text-xs text-blue-800">No todos los perfiles muestran email. <strong>Nutricionistas, dentistas, psicólogos</strong> tienen tasas altas (~70%). Fotógrafos, artistas (~40%).</p>
+          </div>
+        </div>
+        <div class="flex gap-3 bg-slate-50 border border-slate-200 rounded-xl p-3">
+          <span class="text-lg shrink-0">⏱️</span>
+          <div>
+            <p class="text-xs font-semibold text-slate-700 mb-0.5">Muchas búsquedas en poco tiempo</p>
+            <p class="text-xs text-slate-600">Instagram puede responder más lento si se hacen muchas búsquedas seguidas desde la misma IP. Esperar 1-2 horas entre sesiones mejora el rendimiento.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <hr class="border-slate-100 mb-5">
+
+    <!-- Buenas prácticas -->
+    <div class="mb-2">
+      <h4 class="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-3">Buenas prácticas</h4>
+      <ul class="space-y-2 text-sm text-slate-600">
+        <li class="flex gap-2">
+          <svg class="shrink-0 mt-0.5 text-green-500" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+          Para <strong>objetivos grandes (+50)</strong> usa ciudades distintas cada vez: Madrid → Sevilla → Valencia → Bilbao.
+        </li>
+        <li class="flex gap-2">
+          <svg class="shrink-0 mt-0.5 text-green-500" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+          Haz <strong>varios jobs pequeños</strong> (20-40) en lugar de uno grande (100) si ya has buscado ese nicho hoy.
+        </li>
+        <li class="flex gap-2">
+          <svg class="shrink-0 mt-0.5 text-green-500" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+          Los nichos más productivos: nutricionista, psicólogo, fisioterapeuta, dentista, abogado.
+        </li>
+        <li class="flex gap-2">
+          <svg class="shrink-0 mt-0.5 text-green-500" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+          Si un job se queda corto, <strong>espera 3 días</strong> y vuelve a lanzarlo: el pool de candidatos se renueva.
+        </li>
+      </ul>
+    </div>
+
+  </div>
+</div>
+
+<script type="module">
+  import { initInstagramForm } from '{{ url_for("static", path="js/modules/instagram-form.js") }}?v=23';
+
+  // ── Main view switcher (Scraper / Leads / Configuración) ──────────────────
+  const views = {
+    scraper: document.getElementById('ig-view-scraper'),
+    leads:   document.getElementById('ig-view-leads'),
+  };
+  const tabs = document.querySelectorAll('.ig-main-tab');
+
+  function switchMain(name) {
+    tabs.forEach(t => {
+      const sel = t.dataset.view === name;
+      t.className = `ig-main-tab flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium transition ${
+        sel ? 'bg-white text-slate-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+      }`;
+    });
+    if (views.scraper) views.scraper.classList.toggle('hidden', name !== 'scraper');
+    if (views.leads) views.leads.classList.toggle('hidden', name !== 'leads');
+  }
+
+  tabs.forEach(t => t.addEventListener('click', () => switchMain(t.dataset.view)));
+  window.switchMainView = switchMain;
+
+  // Auto-switch to Leads tab when arriving from ?view=leads (e.g. from Bases de datos)
+  const _viewParam = new URLSearchParams(window.location.search).get('view');
+  if (_viewParam === 'leads') switchMain('leads');
+
+  // Make sub-nav buttons always show Leads view when clicked
+  document.getElementById('ig-btn-todos')?.addEventListener('click',   () => switchMain('leads'), true);
+  document.getElementById('ig-btn-scrapeos')?.addEventListener('click', () => switchMain('leads'), true);
+
+  // ── Job detail view helpers ───────────────────────────────────────────────
+  const jobDetailHeader = document.getElementById('ig-job-detail-header');
+  const jobDetailTitle  = document.getElementById('ig-job-detail-title');
+  const jobDetailMeta   = document.getElementById('ig-job-detail-meta');
+  const jobsView        = document.getElementById('ig-jobs-view');
+  const backBtn         = document.getElementById('ig-back-btn');
+
+  const statusLabel = s => ({ completed:'Completado', running:'En curso', failed:'Error', waiting_rate_window:'Pausado', rate_limited:'Límite' }[s] || s);
+
+  function showJobDetail(job) {
+    // Hide the jobs grid, show the detail header with job info
+    jobsView?.classList.add('hidden');
+    if (!jobDetailHeader) return;
+    jobDetailHeader.classList.remove('hidden');
+    const target = (job.target || '').replace('|', ' · ');
+    const mode = 'Dorking';
+    jobDetailTitle.textContent = `${target || '—'}`;
+    const d = job.started_at ? new Date(job.started_at).toLocaleString('es-ES') : '';
+    jobDetailMeta.textContent = `${mode} · ${statusLabel(job.status)} · ${job.emails_found ?? 0} emails · ${d}`;
+  }
+
+  function hideJobDetail() {
+    jobDetailHeader?.classList.add('hidden');
+    jobsView?.classList.remove('hidden');
+  }
+
+  // Back button: return to jobs grid without a specific job selected
+  backBtn?.addEventListener('click', () => {
+    hideJobDetail();
+    document.getElementById('ig-btn-scrapeos')?.click();
+  });
+
+  // igGoToLeads: fired by the JS module when a job card is clicked
+  // At this point displayedJobId is set and the leads table is populated
+  window.igGoToLeads = async () => {
+    switchMain('leads');
+    // Find the highlighted card to get its job_id, then fetch and show the detail header
+    await new Promise(r => setTimeout(r, 30)); // let the module finish setIgViewUi
+    const card = document.querySelector('#ig-jobs-grid a[data-job-id]');
+    // Find the selected card (has ring-2 class set by highlightSelectedJob)
+    const selected = document.querySelector('#ig-jobs-grid a[data-job-id].ring-2') || card;
+    const jobId = selected?.dataset?.jobId;
+    if (jobId) {
+      try {
+        const res = await fetch(`/api/instagram/jobs/${encodeURIComponent(jobId)}`);
+        if (res.ok) showJobDetail(await res.json());
+      } catch (_) {}
+    }
+  };
+
+  initInstagramForm();
+</script>
+
+{% endblock %}

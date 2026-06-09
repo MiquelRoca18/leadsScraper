@@ -1,0 +1,56 @@
+# Directorios del proyecto
+/docs
+/.cursor
+/.venv-tvly
+
+# Ambiente virtual y paquetes
+venv/
+.venv/
+node_modules/
+vendor/
+
+# Archivos de entorno
+.env
+.env.local
+.env.*.local
+instaleads/data/session.json
+instaleads/data/session.json.key
+instaleads/data/sessions/
+
+# Bases de datos
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs y caché
+*.log
+.pytest_cache/
+__pycache__/
+.phpunit.result.cache
+
+# IDE
+.vscode/
+.idea/
+.DS_Store
+
+# Sistema
+Thumbs.db
+.DS_Store
+
+*.md
+!README.md
+!WINDOWS_EXECUTABLE.md
+!DEPLOYMENT.md
+
+/linkedinleads/sessions
+
+# Claude Code
+.claude/
+.claude/settings.local.json
+.claude/agent-memory-local/
+
+# Docker
+.env
+nginx/certs/
+
+CLAUDE.md
