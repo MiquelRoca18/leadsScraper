@@ -35,7 +35,7 @@ leadsScraper es una plataforma modular de scraping con **3 backends independient
 ### macOS / Linux
 
 ```bash
-git clone https://github.com/R4F405/leadsScraper
+git clone https://github.com/MiquelRoca18/leadsScraper
 cd leadsScraper
 ./start_all.sh
 ```
@@ -43,7 +43,7 @@ cd leadsScraper
 ### Windows (manual)
 
 ```cmd
-git clone https://github.com/R4F405/leadsScraper
+git clone https://github.com/MiquelRoca18/leadsScraper
 cd leadsScraper
 ```
 
@@ -72,7 +72,7 @@ Panel disponible en → **`http://localhost:8081`**
 ### Paso 1 · Clonar el repositorio
 
 ```bash
-git clone https://github.com/R4F405/leadsScraper
+git clone https://github.com/MiquelRoca18/leadsScraper
 cd leadsScraper
 ```
 
