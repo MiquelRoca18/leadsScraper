@@ -325,5 +325,5 @@ cd ../linkedinleads && pytest
 ---
 
 <div align="center">
-Made with ☕ by <a href="https://github.com/R4F405">R4F405</a>
+Made with ☕ by <a href="https://github.com/MiquelRoca18"><Miquel Roca></a>
 </div>
