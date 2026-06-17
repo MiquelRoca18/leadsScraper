@@ -61,8 +61,8 @@ echo ============================================
 echo.
 echo El ejecutable se encuentra en: dist\MapLeads-Frontend\MapLeads-Frontend.exe
 echo.
-echo Para ejecutar MultiScraping (panel + backend):
-echo   1. Haz doble clic en: start_multiscraping.bat (en la raiz del repo)
+echo Para ejecutar leadsScraper (panel + backend):
+echo   1. Haz doble clic en: start_leadsScraper.bat (en la raiz del repo)
 echo   O navega a dist\MapLeads-Frontend\ y haz doble clic en MapLeads-Frontend.exe
 echo.
 pause

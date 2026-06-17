@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🕸️ MultiScraping
+# 🕸️ leadsScraper
 
 **Suite de captación de leads desde Google Maps, Instagram y LinkedIn con panel web unificado.**
 
@@ -15,9 +15,9 @@
 
 ---
 
-## ¿Qué es MultiScraping?
+## ¿Qué es leadsScraper?
 
-MultiScraping es una plataforma modular de scraping con **3 backends independientes** y **1 panel web unificado** para generar bases de datos de contactos (emails, teléfonos y metadatos) exportables a CSV.
+leadsScraper es una plataforma modular de scraping con **3 backends independientes** y **1 panel web unificado** para generar bases de datos de contactos (emails, teléfonos y metadatos) exportables a CSV.
 
 | Módulo | Puerto | Fuente |
 |---|---|---|
@@ -35,16 +35,16 @@ MultiScraping es una plataforma modular de scraping con **3 backends independien
 ### macOS / Linux
 
 ```bash
-git clone https://github.com/R4F405/MultiScraping
-cd MultiScraping
+git clone https://github.com/R4F405/leadsScraper
+cd leadsScraper
 ./start_all.sh
 ```
 
 ### Windows (manual)
 
 ```cmd
-git clone https://github.com/R4F405/MultiScraping
-cd MultiScraping
+git clone https://github.com/R4F405/leadsScraper
+cd leadsScraper
 ```
 
 Abre 4 terminales (una por módulo), activa su `venv` y arranca cada servicio:
@@ -72,8 +72,8 @@ Panel disponible en → **`http://localhost:8081`**
 ### Paso 1 · Clonar el repositorio
 
 ```bash
-git clone https://github.com/R4F405/MultiScraping
-cd MultiScraping
+git clone https://github.com/R4F405/leadsScraper
+cd leadsScraper
 ```
 
 ### Paso 2 · Crear entornos e instalar dependencias
@@ -278,7 +278,7 @@ docker compose up -d --build
 ## 🏗️ Estructura del proyecto
 
 ```
-MultiScraping/
+leadsScraper/
 ├── mapleads/          # Backend FastAPI — Google Maps + verificación de emails
 ├── instaleads/        # Backend FastAPI — Instagram (discovery + enrichment)
 ├── linkedinleads/     # Backend FastAPI — LinkedIn con Playwright

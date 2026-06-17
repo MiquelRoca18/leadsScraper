@@ -2,7 +2,7 @@
 
 ## Requisitos
 
-1. **Instalación previa (obligatoria):** sigue primero la sección **Instalación completa (Windows - CMD)** del [`README.md`](README.md) del repositorio (crear `venv` en cada módulo, copiar `.env`, `pip install`, etc.). Sin eso, `start_multiscraping.bat` no podrá arrancar el backend de MapLeads aunque el `.exe` esté compilado. No te adelantes a construir el ejecutable sin haber completado ese paso.
+1. **Instalación previa (obligatoria):** sigue primero la sección **Instalación completa (Windows - CMD)** del [`README.md`](README.md) del repositorio (crear `venv` en cada módulo, copiar `.env`, `pip install`, etc.). Sin eso, `start_leadsScraper.bat` no podrá arrancar el backend de MapLeads aunque el `.exe` esté compilado. No te adelantes a construir el ejecutable sin haber completado ese paso.
 2. Python 3.11+ instalado y accesible desde la terminal (`python` en el PATH).
 3. Para compilar, trabajar desde la carpeta `scraperLead-web` (ver Paso 1).
 
@@ -22,7 +22,7 @@
 
 ## Paso 2: Ejecutar la aplicación
 
-Simplemente **haz doble clic en `start_multiscraping.bat`** (en la raíz del proyecto)
+Simplemente **haz doble clic en `start_leadsScraper.bat`** (en la raíz del proyecto)
 
 - Inicia el backend (scraper) y el frontend juntos
 - Se abrirá automáticamente el navegador en `http://localhost:8081`
@@ -41,10 +41,10 @@ INSTALEADS_API_URL=http://localhost:8002
 PORT=8081
 ```
 
-Después reinicia la app con `start_multiscraping.bat`.
+Después reinicia la app con `start_leadsScraper.bat`.
 
 ---
 
 ## Distribución
 
-Puedes copiar todo el proyecto a otros ordenadores. Solo necesitan ejecutar `build_exe.bat` una vez y después usar `start_multiscraping.bat` siempre.
+Puedes copiar todo el proyecto a otros ordenadores. Solo necesitan ejecutar `build_exe.bat` una vez y después usar `start_leadsScraper.bat` siempre.

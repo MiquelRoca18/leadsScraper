@@ -1,8 +1,8 @@
-# Despliegue de multiScraping en VPS
+# Despliegue de leadsScraper en VPS
 
 ## Configuración crítica: ROOT_PATH
 
-Si estás desplegando multiScraping bajo un sub-path como `/scraper` (para evitar que Chrome bloquee puertos personalizados), **DEBES** configurar `ROOT_PATH` en tu archivo `.env`.
+Si estás desplegando leadsScraper bajo un sub-path como `/scraper` (para evitar que Chrome bloquee puertos personalizados), **DEBES** configurar `ROOT_PATH` en tu archivo `.env`.
 
 ### ¿Por qué es crítico ROOT_PATH?
 
@@ -42,7 +42,7 @@ Si estás desplegando multiScraping bajo un sub-path como `/scraper` (para evita
 ```bash
 # 1. Clonar y configurar
 git clone <repo>
-cd multiScraping
+cd leadsScraper
 
 # 2. Copiar .env template y rellenar
 cp docker-env.example .env
@@ -60,7 +60,7 @@ http://localhost/scraper/
 ```bash
 # 1. En el servidor
 git clone <repo>
-cd multiScraping
+cd leadsScraper
 
 # 2. Crear .env con valores de producción
 cat > .env <<EOF
@@ -105,4 +105,4 @@ curl -vk https://tu-dominio.com/scraper/
 
 - [Plan completo de sub-path deployment](./DEPLOYMENT-PLAN.md)
 - [FastAPI root_path docs](https://fastapi.tiangolo.com/advanced/sub-applications/)
-- [Arquitectura multiScraping](./CLAUDE.md)
+- [Arquitectura leadsScraper](./CLAUDE.md)
