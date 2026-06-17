@@ -24,6 +24,7 @@ leadsScraper es una plataforma modular de scraping con **3 backends independient
 | `mapleads` | `8001` | Google Maps |
 | `instaleads` | `8002` | Instagram |
 | `linkedinleads` | `8003` | LinkedIn |
+| `tiktokleads` | `8004` | TikTok |
 | `scraperLead-web` | `8081` | Panel unificado |
 
 ---
@@ -59,7 +60,10 @@ cd instaleads && uvicorn backend.main:app --host 0.0.0.0 --port 8002
 # Terminal 3 — LinkedInLeads
 cd linkedinleads && uvicorn backend.main:app --host 0.0.0.0 --port 8003
 
-# Terminal 4 — Frontend
+# Terminal 4 — TikTokLeads
+cd tiktokleads && uvicorn backend.main:app --host 0.0.0.0 --port 8004
+
+# Terminal 5 — Frontend
 cd scraperLead-web && python main.py
 ```
 
@@ -88,10 +92,15 @@ cp .env.example .env && pip install -r requirements.txt && deactivate
 
 # instaleads
 cd ../instaleads && python3 -m venv venv && source venv/bin/activate
-cp env.example .env && pip install -r requirements.txt && deactivate
+cp .env.example .env && pip install -r requirements.txt && deactivate
 
 # linkedinleads
 cd ../linkedinleads && python3 -m venv venv && source venv/bin/activate
+cp .env.example .env && pip install -r requirements.txt
+python -m playwright install chromium && deactivate
+
+# tiktokleads
+cd ../tiktokleads && python3 -m venv venv && source venv/bin/activate
 cp .env.example .env && pip install -r requirements.txt
 python -m playwright install chromium && deactivate
 
@@ -113,10 +122,15 @@ copy .env.example .env && pip install -r requirements.txt && deactivate
 
 REM instaleads
 cd ..\instaleads && python -m venv venv && venv\Scripts\activate
-copy env.example .env && pip install -r requirements.txt && deactivate
+copy .env.example .env && pip install -r requirements.txt && deactivate
 
 REM linkedinleads
 cd ..\linkedinleads && python -m venv venv && venv\Scripts\activate
+copy .env.example .env && pip install -r requirements.txt
+python -m playwright install chromium && deactivate
+
+REM tiktokleads
+cd ..\tiktokleads && python -m venv venv && venv\Scripts\activate
 copy .env.example .env && pip install -r requirements.txt
 python -m playwright install chromium && deactivate
 
@@ -147,7 +161,8 @@ cd ..
 | 1 | MapLeads | `cd mapleads` → activar venv → `uvicorn backend.main:app --host 0.0.0.0 --port 8001` |
 | 2 | InstaLeads | `cd instaleads` → activar venv → `uvicorn backend.main:app --host 0.0.0.0 --port 8002` |
 | 3 | LinkedInLeads | `cd linkedinleads` → activar venv → `uvicorn backend.main:app --host 0.0.0.0 --port 8003` |
-| 4 | Frontend | `cd scraperLead-web` → activar venv → `python main.py` |
+| 4 | TikTokLeads | `cd tiktokleads` → activar venv → `uvicorn backend.main:app --host 0.0.0.0 --port 8004` |
+| 5 | Frontend | `cd scraperLead-web` → activar venv → `python main.py` |
 
 ---
 
@@ -228,6 +243,11 @@ docker compose up -d --build
 | `DEDUPE_DAYS` | Ventana para no repetir negocios recientes |
 | `API_KEY` | Si está definida, requiere `X-API-Key` en cabeceras |
 
+> **Modos de proxy en MapLeads:**
+> - `PROXY_LIST=http://user:pass@host:port,...` → usa esos proxies rotativos
+> - `PROXY_LIST=` (vacío) y sin `PROXY_USER/PASS` → **modo directo** (sin proxy, válido para desarrollo)
+> - Si los proxies fallan (credenciales caducadas, sin saldo), el sistema hace **fallback automático** a conexión directa
+
 </details>
 
 <details>
@@ -282,11 +302,33 @@ leadsScraper/
 ├── mapleads/          # Backend FastAPI — Google Maps + verificación de emails
 ├── instaleads/        # Backend FastAPI — Instagram (discovery + enrichment)
 ├── linkedinleads/     # Backend FastAPI — LinkedIn con Playwright
+├── tiktokleads/       # Backend FastAPI — TikTok con Playwright
 ├── scraperLead-web/   # Frontend FastAPI + Jinja + JS (dashboard unificado)
 ├── nginx/             # Configuración Nginx para Docker/VPS
 ├── docker-compose.yml
 └── start_all.sh       # Script de arranque (macOS/Linux)
 ```
+
+---
+
+## 🔐 Login en el panel
+
+Al abrir `http://localhost:8081` se pedirán credenciales. Las credenciales por defecto están definidas en `scraperLead-web/.env`:
+
+```
+AUTH_USERS=admin:password123,maria:otrapassword
+```
+
+| Usuario | Contraseña |
+|---|---|
+| `admin` | `password123` |
+| `maria` | `otrapassword` |
+
+> Para añadir o cambiar usuarios edita `AUTH_USERS` en `scraperLead-web/.env` con el formato `usuario:contraseña` separados por comas. También puedes usar hashes bcrypt para mayor seguridad:
+> ```bash
+> python3 -c "import bcrypt; print(bcrypt.hashpw(b'mipassword', bcrypt.gensalt()).decode())"
+> # Resultado: $2b$12$...  → AUTH_USERS=admin:$2b$12$...
+> ```
 
 ---
 
@@ -302,6 +344,7 @@ open http://localhost:8081
 curl http://localhost:8001/api/health            # MapLeads
 curl http://localhost:8002/api/instagram/health  # InstaLeads
 curl http://localhost:8003/api/linkedin/health   # LinkedInLeads
+curl http://localhost:8004/api/tiktok/health     # TikTokLeads
 ```
 
 ---
@@ -317,10 +360,6 @@ cd ../linkedinleads && pytest
 ```
 
 ---
-
-## ⚠️ Aviso
-
-> Las rutas de TikTok (`/tiktok`, etc.) están presentes en el frontend pero **no tienen backend activo** en este repositorio. Esas secciones quedan sin servicio salvo que integres uno por tu cuenta.
 
 ---
 

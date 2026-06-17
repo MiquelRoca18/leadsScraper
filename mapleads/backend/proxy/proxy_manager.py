@@ -121,10 +121,46 @@ class ProxyManager:
             self._daily_reset_date = today
             logger.info("ProxyManager: daily request counter reset")
 
+    @property
+    def is_bandwidth_exhausted(self) -> bool:
+        """True when every configured proxy has been permanently marked as bandwidth-exhausted."""
+        if not self._stats:
+            return False
+        return all(s.bandwidth_exhausted for s in self._stats.values())
+
+    async def report_bandwidth_exhausted(self, proxy_url: str) -> None:
+        """
+        Mark a proxy as permanently bandwidth-exhausted (e.g. proxy returns 402).
+        Unlike report_error, this is not a temporary cooldown — the proxy won't
+        recover until the plan resets (typically monthly).
+        When ALL proxies are exhausted, the system automatically falls back to
+        direct connection (no proxy) so scraping can continue.
+        """
+        self._ensure_initialized()
+        if not proxy_url or proxy_url not in self._stats:
+            return
+        async with self._lock:
+            self._stats[proxy_url].bandwidth_exhausted = True
+            exhausted = sum(1 for s in self._stats.values() if s.bandwidth_exhausted)
+            total = len(self._stats)
+            if exhausted == total:
+                logger.warning(
+                    "ProxyManager: ALL %d proxies bandwidth-exhausted — "
+                    "switching to direct connection (fallback mode). "
+                    "Proxies will resume when bandwidth resets (monthly).",
+                    total,
+                )
+            else:
+                logger.warning(
+                    "ProxyManager: proxy bandwidth-exhausted (%d/%d exhausted).",
+                    exhausted, total,
+                )
+
     async def get_next(self) -> str | None:
         """
         Return the best available proxy URL, or None if:
         - No credentials configured (dev mode — caller uses None = direct connection)
+        - All proxies are bandwidth-exhausted (fallback mode — direct connection)
         - All proxies are in cooldown
         - Daily limit reached
         """
@@ -133,6 +169,10 @@ class ProxyManager:
         if not self._stats:
             logger.debug("ProxyManager.get_next(): dev mode (no proxies configured)")
             return None  # dev mode
+
+        if self.is_bandwidth_exhausted:
+            logger.debug("ProxyManager.get_next(): all proxies bandwidth-exhausted — direct fallback")
+            return None  # bandwidth fallback mode
 
         async with self._lock:
             self._reset_daily_counter_if_needed()
@@ -243,6 +283,13 @@ class ProxyManager:
                     self._waiting_jobs.pop(job_id, None)
                 return None
 
+            # If all proxies are permanently bandwidth-exhausted, return None immediately
+            # so the caller can fall back to direct connection without waiting.
+            if self.is_bandwidth_exhausted:
+                if job_id:
+                    self._waiting_jobs.pop(job_id, None)
+                return None
+
             proxy = await self.get_next()
 
             if proxy is not None:
@@ -323,7 +370,7 @@ class ProxyManager:
         """
         self._ensure_initialized()
 
-        if not self._stats:
+        if not self._stats or self.is_bandwidth_exhausted:
             return {
                 "companies_before_wait": 9999,
                 "requests_available_now": 9999,
@@ -333,6 +380,7 @@ class ProxyManager:
                 "requests_per_company_estimate": _REQUESTS_PER_COMPANY,
                 "cooldown_seconds": settings.proxy_cooldown_seconds,
                 "dev_mode": True,
+                "bandwidth_exhausted": self.is_bandwidth_exhausted,
             }
 
         self._reset_daily_counter_if_needed()
@@ -374,6 +422,7 @@ class ProxyManager:
             "total_proxies": len(self._stats),
             "available_now": available,
             "in_cooldown": len(self._stats) - available,
+            "bandwidth_exhausted": self.is_bandwidth_exhausted,
             "daily_requests_used": self._daily_count,
             "daily_requests_limit": settings.max_requests_per_day,
             "daily_requests_remaining": remaining,
@@ -381,6 +430,7 @@ class ProxyManager:
                 {
                     "id": i + 1,
                     "available": s.is_available,
+                    "bandwidth_exhausted": s.bandwidth_exhausted,
                     "total_requests": s.total_requests,
                     "error_rate": f"{s.error_rate:.0%}",
                     "cooldown_remaining_seconds": s.seconds_until_available,

@@ -99,9 +99,11 @@ async def _fetch_place_details(hex_cid: str) -> dict | None:
         return None
 
     proxy = await proxy_manager.wait_for_available()
-    if proxy is None and proxy_manager._stats:
+    if proxy is None and proxy_manager._stats and not proxy_manager.is_bandwidth_exhausted:
         logger.warning("_fetch_place_details: no proxy available for cid=%s", hex_cid)
         return None
+    if proxy is None and proxy_manager.is_bandwidth_exhausted:
+        logger.info("_fetch_place_details: all proxies bandwidth-exhausted — using direct connection")
 
     proxies = {"https": proxy, "http": proxy} if proxy else None
 
@@ -124,7 +126,10 @@ async def _fetch_place_details(hex_cid: str) -> dict | None:
     except Exception as exc:
         logger.debug("_fetch_place_details: HTML fetch error cid=%s: %s", hex_cid, exc)
         if proxy:
-            await proxy_manager.report_error(proxy)
+            if "CONNECT tunnel failed" in str(exc) or "ProxyError" in type(exc).__name__:
+                await proxy_manager.report_bandwidth_exhausted(proxy)
+            else:
+                await proxy_manager.report_error(proxy)
         return None
 
     if html_response.status_code == 429:
@@ -150,7 +155,7 @@ async def _fetch_place_details(hex_cid: str) -> dict | None:
     # --- Step 2: Fetch the preview/place JSON endpoint ---
     try:
         preview_proxy = await proxy_manager.wait_for_available()
-        if preview_proxy is None and proxy_manager._stats:
+        if preview_proxy is None and proxy_manager._stats and not proxy_manager.is_bandwidth_exhausted:
             return None
         preview_proxies = {"https": preview_proxy, "http": preview_proxy} if preview_proxy else None
 
@@ -206,9 +211,11 @@ async def _fetch_cid_list(
     Returns up to 20 hex CID strings. Empty list on error.
     """
     proxy = await proxy_manager.wait_for_available()
-    if proxy is None and proxy_manager._stats:
+    if proxy is None and proxy_manager._stats and not proxy_manager.is_bandwidth_exhausted:
         logger.warning("_fetch_cid_list: no proxy available, skipping")
         return []
+    if proxy is None and proxy_manager.is_bandwidth_exhausted:
+        logger.info("_fetch_cid_list: all proxies bandwidth-exhausted — using direct connection")
 
     # Build query string: combine keyword + location text (if any)
     search_query = f"{query} {location}".strip() if location else query
@@ -290,7 +297,10 @@ async def _fetch_cid_list(
         if isinstance(exc, MapsFetchError):
             raise
         if proxy:
-            await proxy_manager.report_error(proxy)
+            if "CONNECT tunnel failed" in str(exc) or "ProxyError" in type(exc).__name__:
+                await proxy_manager.report_bandwidth_exhausted(proxy)
+            else:
+                await proxy_manager.report_error(proxy)
         raise MapsFetchError(str(exc), kind="connection", retryable=True) from exc
 
 
