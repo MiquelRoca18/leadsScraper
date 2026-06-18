@@ -29,48 +29,6 @@ leadsScraper es una plataforma modular de scraping con **3 backends independient
 
 ---
 
-## 🚀 Arranque rápido
-
-> Si es tu primera vez, ve directamente a la [instalación completa](#-instalación-completa).
-
-### macOS / Linux
-
-```bash
-git clone https://github.com/MiquelRoca18/leadsScraper
-cd leadsScraper
-./start_all.sh
-```
-
-### Windows (manual)
-
-```cmd
-git clone https://github.com/MiquelRoca18/leadsScraper
-cd leadsScraper
-```
-
-Abre 4 terminales (una por módulo), activa su `venv` y arranca cada servicio:
-
-```bash
-# Terminal 1 — MapLeads
-cd mapleads && uvicorn backend.main:app --host 0.0.0.0 --port 8001
-
-# Terminal 2 — InstaLeads
-cd instaleads && uvicorn backend.main:app --host 0.0.0.0 --port 8002
-
-# Terminal 3 — LinkedInLeads
-cd linkedinleads && uvicorn backend.main:app --host 0.0.0.0 --port 8003
-
-# Terminal 4 — TikTokLeads
-cd tiktokleads && uvicorn backend.main:app --host 0.0.0.0 --port 8004
-
-# Terminal 5 — Frontend
-cd scraperLead-web && python main.py
-```
-
-Panel disponible en → **`http://localhost:8081`**
-
----
-
 ## 📦 Instalación completa
 
 ### Paso 1 · Clonar el repositorio
