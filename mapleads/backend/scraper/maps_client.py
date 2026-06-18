@@ -105,40 +105,54 @@ async def _fetch_place_details(hex_cid: str) -> dict | None:
     if proxy is None and proxy_manager.is_bandwidth_exhausted:
         logger.info("_fetch_place_details: all proxies bandwidth-exhausted — using direct connection")
 
-    proxies = {"https": proxy, "http": proxy} if proxy else None
-
     # --- Step 1: Fetch place page HTML to get the preview URL ---
-    try:
-        loop = asyncio.get_running_loop()
-        html_response = await loop.run_in_executor(
-            None,
-            lambda: curl_requests.get(
-                _MAPS_PLACE_URL,
-                params={"cid": decimal, "hl": "es", "gl": "es"},
-                headers=_PLACE_HEADERS,
-                cookies=_GOOGLE_CONSENT_COOKIES,
-                proxies=proxies,
-                impersonate="chrome131",
-                timeout=15,
-                allow_redirects=True,
-            ),
-        )
-    except Exception as exc:
-        logger.debug("_fetch_place_details: HTML fetch error cid=%s: %s", hex_cid, exc)
-        if proxy:
-            if "CONNECT tunnel failed" in str(exc) or "ProxyError" in type(exc).__name__:
-                await proxy_manager.report_bandwidth_exhausted(proxy)
-            else:
-                await proxy_manager.report_error(proxy)
+    # On 402/ProxyError, retry immediately with direct connection (same as _fetch_cid_list)
+    proxies_to_try: list[str | None] = [proxy]
+    html: str | None = None
+    html_response = None
+
+    for current_proxy in proxies_to_try:
+        proxies = {"https": current_proxy, "http": current_proxy} if current_proxy else None
+        try:
+            loop = asyncio.get_running_loop()
+            html_response = await loop.run_in_executor(
+                None,
+                lambda: curl_requests.get(
+                    _MAPS_PLACE_URL,
+                    params={"cid": decimal, "hl": "es", "gl": "es"},
+                    headers=_PLACE_HEADERS,
+                    cookies=_GOOGLE_CONSENT_COOKIES,
+                    proxies=proxies,
+                    impersonate="chrome131",
+                    timeout=15,
+                    allow_redirects=True,
+                ),
+            )
+            break  # request succeeded; handle status outside the loop
+        except Exception as exc:
+            logger.debug("_fetch_place_details: HTML fetch error cid=%s: %s", hex_cid, exc)
+            if current_proxy and ("CONNECT tunnel failed" in str(exc) or "ProxyError" in type(exc).__name__):
+                await proxy_manager.report_bandwidth_exhausted(current_proxy)
+                if None not in proxies_to_try:
+                    logger.info(
+                        "_fetch_place_details: proxy returned 402 — retrying with direct connection"
+                    )
+                    proxies_to_try.append(None)
+                    continue
+            elif current_proxy:
+                await proxy_manager.report_error(current_proxy)
+            return None
+
+    if html_response is None:
         return None
 
     if html_response.status_code == 429:
-        await proxy_manager.report_error(proxy)
+        await proxy_manager.report_error(current_proxy)
         return None
     if html_response.status_code != 200:
         logger.debug("_fetch_place_details: HTML status %d for cid=%s",
                      html_response.status_code, hex_cid)
-        await proxy_manager.report_error(proxy)
+        await proxy_manager.report_error(current_proxy)
         return None
     if "Antes de ir a Google Maps" in html_response.text or "Before you continue" in html_response.text:
         logger.warning("_fetch_place_details: consent page for cid=%s — check cookies", hex_cid)
@@ -185,7 +199,7 @@ async def _fetch_place_details(hex_cid: str) -> dict | None:
 
     business = parse_place_from_preview_json(raw, hex_cid)
     if business:
-        await proxy_manager.report_success(proxy)
+        await proxy_manager.report_success(preview_proxy)
         logger.debug("_fetch_place_details: resolved '%s' via preview JSON", business.get("business_name"))
     else:
         logger.debug("_fetch_place_details: preview JSON parse failed for cid=%s, using title fallback", hex_cid)
@@ -209,6 +223,10 @@ async def _fetch_cid_list(
     Maps search on the given coordinates with a zoom level derived from radius_km.
 
     Returns up to 20 hex CID strings. Empty list on error.
+
+    Proxy fallback: if the selected proxy returns a 402 (bandwidth exhausted),
+    the request is retried immediately with a direct connection instead of
+    propagating the error.  This ensures a single bad proxy never kills the job.
     """
     proxy = await proxy_manager.wait_for_available()
     if proxy is None and proxy_manager._stats and not proxy_manager.is_bandwidth_exhausted:
@@ -238,70 +256,91 @@ async def _fetch_cid_list(
             lat, lng, zoom, radius_km,
         )
 
-    proxies = {"https": proxy, "http": proxy} if proxy else None
+    # On 402/ProxyError, we add None (direct) to the list and retry immediately
+    # instead of propagating the error and waiting for all proxies to fail.
+    proxies_to_try: list[str | None] = [proxy]
+    last_exc: Exception | None = None
 
-    try:
-        loop = asyncio.get_running_loop()
-        response = await loop.run_in_executor(
-            None,
-            lambda: curl_requests.get(
-                _SEARCH_URL,
-                params=params,
-                headers=_SEARCH_HEADERS,
-                cookies=_GOOGLE_CONSENT_COOKIES,
-                proxies=proxies,
-                impersonate="chrome131",
-                timeout=20,
-            ),
-        )
-
-        if response.status_code == 429:
-            await proxy_manager.report_error(proxy)
-            raise MapsFetchError("Maps rate limited (429)", kind="rate_limited", retryable=True)
-
-        if response.status_code != 200:
-            logger.warning("_fetch_cid_list: status %d for '%s'", response.status_code, search_query)
-            await proxy_manager.report_error(proxy)
-            raise MapsFetchError(
-                f"Maps unexpected status {response.status_code}",
-                kind="bad_status",
-                retryable=True,
+    for current_proxy in proxies_to_try:
+        proxies = {"https": current_proxy, "http": current_proxy} if current_proxy else None
+        try:
+            loop = asyncio.get_running_loop()
+            response = await loop.run_in_executor(
+                None,
+                lambda: curl_requests.get(
+                    _SEARCH_URL,
+                    params=params,
+                    headers=_SEARCH_HEADERS,
+                    cookies=_GOOGLE_CONSENT_COOKIES,
+                    proxies=proxies,
+                    impersonate="chrome131",
+                    timeout=20,
+                ),
             )
 
-        raw = response.text
-        if raw.startswith(")]}'"):
-            raw = raw[4:].lstrip("\n")
+            if response.status_code == 429:
+                await proxy_manager.report_error(current_proxy)
+                raise MapsFetchError("Maps rate limited (429)", kind="rate_limited", retryable=True)
 
-        # Try old full-detail format first (FORMAT A)
-        businesses = parse_maps_response(raw)
-        if businesses:
-            await proxy_manager.report_success(proxy)
-            logger.debug("_fetch_cid_list: FORMAT A hit — %d businesses directly", len(businesses))
-            # Return a special sentinel so search_maps knows to use these directly
-            return [("__FORMAT_A__", businesses)]  # type: ignore[list-item]
+            if response.status_code != 200:
+                logger.warning("_fetch_cid_list: status %d for '%s'", response.status_code, search_query)
+                await proxy_manager.report_error(current_proxy)
+                raise MapsFetchError(
+                    f"Maps unexpected status {response.status_code}",
+                    kind="bad_status",
+                    retryable=True,
+                )
 
-        # New CID-only format (FORMAT B)
-        cids = parse_cids_from_maps_response(raw)
-        if cids:
-            await proxy_manager.report_success(proxy)
-            logger.debug("_fetch_cid_list: FORMAT B — %d CIDs for '%s' start=%d", len(cids), search_query, start)
-        else:
-            logger.debug("_fetch_cid_list: no data in either format for '%s'", search_query)
-            # Puede ser 'sin resultados' real. No lo tratamos como error operativo.
+            raw = response.text
+            if raw.startswith(")]}'"):
+                raw = raw[4:].lstrip("\n")
 
-        await asyncio.sleep(random.uniform(settings.request_delay_min, settings.request_delay_max))
-        return cids
+            # Try old full-detail format first (FORMAT A)
+            businesses = parse_maps_response(raw)
+            if businesses:
+                await proxy_manager.report_success(current_proxy)
+                logger.debug("_fetch_cid_list: FORMAT A hit — %d businesses directly", len(businesses))
+                # Return a special sentinel so search_maps knows to use these directly
+                return [("__FORMAT_A__", businesses)]  # type: ignore[list-item]
 
-    except Exception as exc:
-        logger.error("_fetch_cid_list('%s', start=%d): error=%s", search_query, start, exc, exc_info=True)
-        if isinstance(exc, MapsFetchError):
-            raise
-        if proxy:
-            if "CONNECT tunnel failed" in str(exc) or "ProxyError" in type(exc).__name__:
-                await proxy_manager.report_bandwidth_exhausted(proxy)
+            # New CID-only format (FORMAT B)
+            cids = parse_cids_from_maps_response(raw)
+            if cids:
+                await proxy_manager.report_success(current_proxy)
+                logger.debug("_fetch_cid_list: FORMAT B — %d CIDs for '%s' start=%d", len(cids), search_query, start)
             else:
-                await proxy_manager.report_error(proxy)
-        raise MapsFetchError(str(exc), kind="connection", retryable=True) from exc
+                logger.debug("_fetch_cid_list: no data in either format for '%s'", search_query)
+                # Puede ser 'sin resultados' real. No lo tratamos como error operativo.
+
+            await asyncio.sleep(random.uniform(settings.request_delay_min, settings.request_delay_max))
+            return cids
+
+        except MapsFetchError as exc:
+            # Maps-level errors (429, bad status): don't retry with direct connection
+            last_exc = exc
+            break
+
+        except Exception as exc:
+            logger.error("_fetch_cid_list('%s', start=%d): error=%s", search_query, start, exc, exc_info=True)
+            if current_proxy and ("CONNECT tunnel failed" in str(exc) or "ProxyError" in type(exc).__name__):
+                await proxy_manager.report_bandwidth_exhausted(current_proxy)
+                # Immediately retry with direct connection (don't wait for all proxies to fail)
+                if None not in proxies_to_try:
+                    logger.info(
+                        "_fetch_cid_list: proxy returned 402 (bandwidth exhausted) — "
+                        "retrying with direct connection"
+                    )
+                    proxies_to_try.append(None)
+                last_exc = MapsFetchError(str(exc), kind="connection", retryable=True)
+                continue  # try direct next
+            elif current_proxy:
+                await proxy_manager.report_error(current_proxy)
+            last_exc = MapsFetchError(str(exc), kind="connection", retryable=True)
+            break
+
+    if last_exc is not None:
+        raise last_exc
+    return []
 
 
 async def search_maps(

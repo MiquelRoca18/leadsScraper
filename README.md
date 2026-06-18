@@ -131,7 +131,7 @@ Opción recomendada para VPS. No requiere Python ni entornos virtuales.
 ### 1 · Configurar variables de entorno
 
 ```bash
-cp docker-env.example .env
+cp .env.example .env
 ```
 
 Edita `.env` con estos valores obligatorios:
@@ -145,6 +145,8 @@ Edita `.env` con estos valores obligatorios:
 | `LINKEDINLEADS_API_URL` | URL interna de LinkedInLeads | `http://linkedinleads:8003` |
 
 > ⚠️ El `.env` **nunca se sube a GitHub** — está en el `.gitignore`.
+>
+> 📝 **Nota sobre `.env`:** El `.env.example` de la **raíz** es exclusivo para Docker (Docker Compose lo lee con `env_file: .env`). Para desarrollo local con `start_all.sh` cada módulo usa su propio `.env` interno (ya copiado en los pasos anteriores).
 
 ### 2 · Construir y arrancar
 
