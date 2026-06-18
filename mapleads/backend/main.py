@@ -10,6 +10,10 @@ from backend.storage.database import init_db
 
 logger = logging.getLogger(__name__)
 
+# aiosqlite emits extremely verbose DEBUG logs for every single SQL operation;
+# cap it at WARNING so it doesn't drown out useful app-level debug output.
+logging.getLogger("aiosqlite").setLevel(logging.WARNING)
+
 _PUBLIC_PREFIXES = ("/api/health",)
 
 

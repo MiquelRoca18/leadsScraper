@@ -167,25 +167,39 @@ async def _fetch_place_details(hex_cid: str) -> dict | None:
         return parse_place_from_html(html, hex_cid)
 
     # --- Step 2: Fetch the preview/place JSON endpoint ---
-    try:
-        preview_proxy = await proxy_manager.wait_for_available()
-        if preview_proxy is None and proxy_manager._stats and not proxy_manager.is_bandwidth_exhausted:
-            return None
-        preview_proxies = {"https": preview_proxy, "http": preview_proxy} if preview_proxy else None
+    # Same proxy→direct fallback as Step 1
+    preview_proxy = await proxy_manager.wait_for_available()
+    if preview_proxy is None and proxy_manager._stats and not proxy_manager.is_bandwidth_exhausted:
+        return None
 
-        json_response = await loop.run_in_executor(
-            None,
-            lambda: curl_requests.get(
-                preview_url,
-                headers=_PREVIEW_HEADERS,
-                cookies=_GOOGLE_CONSENT_COOKIES,
-                proxies=preview_proxies,
-                impersonate="chrome131",
-                timeout=15,
-            ),
-        )
-    except Exception as exc:
-        logger.debug("_fetch_place_details: preview fetch error cid=%s: %s", hex_cid, exc)
+    step2_proxies_to_try: list[str | None] = [preview_proxy]
+    json_response = None
+
+    for step2_proxy in step2_proxies_to_try:
+        step2_proxies = {"https": step2_proxy, "http": step2_proxy} if step2_proxy else None
+        try:
+            json_response = await loop.run_in_executor(
+                None,
+                lambda: curl_requests.get(
+                    preview_url,
+                    headers=_PREVIEW_HEADERS,
+                    cookies=_GOOGLE_CONSENT_COOKIES,
+                    proxies=step2_proxies,
+                    impersonate="chrome131",
+                    timeout=15,
+                ),
+            )
+            break
+        except Exception as exc:
+            if step2_proxy and ("CONNECT tunnel failed" in str(exc) or "ProxyError" in type(exc).__name__):
+                await proxy_manager.report_bandwidth_exhausted(step2_proxy)
+                if None not in step2_proxies_to_try:
+                    step2_proxies_to_try.append(None)
+                    continue
+            logger.debug("_fetch_place_details: preview fetch error cid=%s: %s", hex_cid, exc)
+            return parse_place_from_html(html, hex_cid)
+
+    if json_response is None:
         return parse_place_from_html(html, hex_cid)
 
     if json_response.status_code != 200:
